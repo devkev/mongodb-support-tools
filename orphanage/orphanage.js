@@ -1,7 +1,7 @@
 /*
  *
  * orphanage.js -- Utility to find and remove orphaned documents
- * 10gen 2012-2014 -- Tyler Brock, Scott Hernandez, Jacob Ribnik
+ * 10gen 2012-2014 -- Tyler Brock, Scott Hernandez, Jacob Ribnik, Kevin Pulo
  *
  * Script Orphan Finder Procedure:
  *  - Set up a connection to each shard
@@ -19,11 +19,24 @@
  *  - var shard1 = st.shard1
  *
  * Usage:
- *  - sh.stopBalancer()               -- Stop the balancer
- *  - Orphans.find('db.collection')   -- Find orphans in a given namespace
- *  - Orphans.findAll()               -- Find orphans in all namespaces
- *  - Orphans.remove()                -- Removes the next chunk
- *  - Orphans.setBalancerParanoia(bool) -- Check balancer state before trying remove; default is true
+ *  - sh.stopBalancer()                          -- Stop the balancer
+ *  - Orphans.find('db.collection')              -- Find orphans in a given namespace
+ *  - var results = Orphans.findAll()            -- Find orphans in all namespaces
+ *    for (ns in results) results[ns].listAll()  -- List details of all orphaned chunks in all namespaces
+ *  - Orphans.removeAll(results)                 -- Removes all orphaned chunks in all namespaces (better to first examine them carefully)
+ *  - Orphans.setBalancerParanoia(bool)          -- Check balancer state before trying remove; default is true
+ *
+ * To remove orphaned documents:
+ *  - var result = Orphans.find('db.collection')
+ *    result                            -- Show orphaned chunk details as a cursor
+ *    result.listAll()                  -- List details of all orphaned chunk
+ *    result.listAll(true)              -- List details of all orphaned chunk (pretty print)
+ *    result.hasNext()                  -- Returns true if ns has more orphaned chunks
+ *    result.next()                     -- Shows information about the next orphaned chunk
+ *    result.current()                  -- Shows information about the current orphaned chunk
+ *    result.rewind()                   -- Start iterating from the first orphaned chunk
+ *    result.remove()                   -- Removes the current orphaned chunk
+ *    result.removeAll()                -- Removes all orphaned chunks
  *
  *  DISCLAIMER
  *
@@ -146,19 +159,72 @@ var Orphans = {
       lastMin: {},
       count: 0,
       shardCounts:{},
+      _iter: -1,
       hasNext: function(){
-        if (this.badChunks.length > 0) { return true }
+        if (this.badChunks.length > this._iter + 1) { return true }
         else { return false }
       },
+      current: function() {
+        return this.badChunks[this._iter]
+      },
       next: function() {
-        bchunk = this.badChunks[0]
-//        print("Calling Orphans.remove() will remove " + bchunk.orphanCount +
-//              " orphans from chunk " + bchunk._id + " on " + bchunk.orphanedOn)
-//        print("Documents for this chunk should only exist on " + bchunk.shard)
+        this._iter++;
+        return this.current();
+      },
+      rewind: function() {
+          this._iter = -1;
+      },
+      shellPrint: function() {
+          try {
+              var n = 0;
+              while ( this.hasNext() && n < DBQuery.shellBatchSize ){
+                  var s = this._prettyShell ? tojson( this.next() ) : tojson( this.next() , "" , true );
+                  print( s );
+                  n++;
+              }
+              if ( this.hasNext() ){
+                  print( "Type \"it\" for more" );
+                  ___it___  = this;
+              }
+              else {
+                  ___it___  = null;
+              }
+         }
+          catch ( e ){
+              print( e );
+          }
+      },
+      listAll: function(pretty) {
+          this.rewind();
+          while (this.hasNext()) {
+            var s = pretty ? tojson( this.next() ) : tojson( this.next() , "" , true );
+            print( s );
+          }
+          this.rewind();
       },
       remove: function() {
-        var bchunk = this.badChunks.splice(0,1)[0]
-        print("Removing orphaned chunk " + bchunk._id + " from " + bchunk.orphanedOn)
+        if (this.count == 0 || this.badChunks.length == 0) {
+           print("No orphaned chunks found, nothing to remove.");
+           return 0;
+        }
+        if (this._iter < 0) {
+           print("No orphaned chunks examined, call result.next() to check what would be removed.");
+           return 0;
+        }
+        if (this._iter >= this.badChunks.length) {
+           print("No orphaned chunks left, call result.rewind() start over.");
+           return 0;
+        }
+        var bchunk = this.badChunks[this._iter]
+        if ( ! bchunk) {
+           print("Bad orphaned chunk (null/undefined), cannot remove.");
+           return 0;
+        }
+        if (bchunk.removed) {
+           print("Orphaned chunk " + bchunk._id + " on " + bchunk.orphanedOn + " has already been removed, not removing.");
+           return 0;
+        }
+        print("Removing orphaned chunk " + bchunk._id + " (with " + bchunk.orphanCount + " expected orphaned documents) from " + bchunk.orphanedOn)
         var naCollection = connections[bchunk.orphanedOn].getCollection(namespace)
         var toRemove = naCollection.find({}, {_id: 1}).min(bchunk.min).max(bchunk.max)
         var idsToRemove = []
@@ -192,13 +258,17 @@ var Orphans = {
           print("-> There was an error: " + error);
         } else {
           print("-> Sucessfully removed " + removedCount + " orphaned documents from " + namespace);
+          bchunk.removed = true;
+          bchunk.numRemoved = removedCount;
         }
 
         return removedCount;
       },
       removeAll: function(secs) {
           var num = 0;
+          this.rewind();
           while (this.hasNext()) {
+            this.next();
             num += this.remove()
             if(secs)
                 sleep(secs * 1000);
@@ -288,16 +358,23 @@ print("*** This is dangerous -- we are not responsible for data loss ***")
 print("***    Run only on a mongos connected to a sharded cluster    ***")
 print("")
 print("usage:")
-print("Orphanage.global.auth('username','password') -- Set global authentication parameters")
-print("Orphanage.shard.auth('shard','username','password') -- Set shard authentication parameters")
-print("Shard.active = \[\"shard1\",\"shard2\"\]-- Specify active shards (they will be used for finding orphans)")
-print("Orphans.find('db.collection')     -- Find orphans in a given namespace")
-print("Orphans.findAll()                 -- Find orphans in all namespaces")
-print("Orphans.removeAll(findAllResults) -- Removes orphans in all namespaces")
+print("Orphanage.global.auth('username','password')         -- Set global authentication parameters")
+print("Orphanage.shard.auth('shard','username','password')  -- Set shard authentication parameters")
+print("Shard.active = \[\"shard1\",\"shard2\"\]   -- Specify active shards (they will be used for finding orphans)")
+print("Orphans.find('db.collection')              -- Find orphans in a given namespace")
+print("var results = Orphans.findAll()            -- Find orphans in all namespaces")
+print("for (ns in results) results[ns].listAll()  -- List details of all orphaned chunks in all namespaces")
+print("Orphans.removeAll(results)                 -- Removes all orphaned chunks in all namespaces")
 print("")
 print("To remove orphaned documents:")
 print("var result = Orphans.find('db.collection')")
-print("result.hasNext()                  -- Returns true if ns has more bad chunks")
-print("result.next()                     -- Shows information about the next chunk")
-print("result.remove()                   -- Removes the next chunk")
+print("result                            -- Show orphaned chunk details as a cursor")
+print("result.listAll()                  -- List details of all orphaned chunk")
+print("result.listAll(true)              -- List details of all orphaned chunk (pretty print)")
+print("result.hasNext()                  -- Returns true if ns has more orphaned chunks")
+print("result.next()                     -- Shows information about the next orphaned chunk")
+print("result.current()                  -- Shows information about the current orphaned chunk")
+print("result.rewind()                   -- Start iterating from the first orphaned chunk")
+print("result.remove()                   -- Removes the current orphaned chunk")
+print("result.removeAll()                -- Removes all orphaned chunks")
 print("")
