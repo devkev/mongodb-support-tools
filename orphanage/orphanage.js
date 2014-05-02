@@ -123,6 +123,13 @@ var Shard = {
         conns[shard._id] = Orphanage.shardConnection(shard);
     });
     return conns;
+  },
+
+  // Returns all shards in the system
+  allShards: function() {
+    var all = [];
+    db.getSiblingDB("config").shards.find().forEach(function (x) { all.push(x._id) });
+    return all;
   }
 }
 
@@ -357,24 +364,27 @@ print("***                    Loaded orphanage.js                    ***")
 print("*** This is dangerous -- we are not responsible for data loss ***")
 print("***    Run only on a mongos connected to a sharded cluster    ***")
 print("")
-print("usage:")
-print("Orphanage.global.auth('username','password')         -- Set global authentication parameters")
-print("Orphanage.shard.auth('shard','username','password')  -- Set shard authentication parameters")
-print("Shard.active = \[\"shard1\",\"shard2\"\]   -- Specify active shards (they will be used for finding orphans)")
-print("Orphans.find('db.collection')              -- Find orphans in a given namespace")
-print("var results = Orphans.findAll()            -- Find orphans in all namespaces")
-print("for (ns in results) results[ns].listAll()  -- List details of all orphaned chunks in all namespaces")
-print("Orphans.removeAll(results)                 -- Removes all orphaned chunks in all namespaces")
+print("Usage:")
+print("  Orphanage.global.auth('username','password')         -- Set global authentication parameters")
+print("  Orphanage.shard.auth('shard','username','password')  -- Set shard authentication parameters")
+print("")
+print("  Shard.active = \[\"shard1\",\"shard2\"\]         -- Specify active shards (they will be used for finding orphans)")
+print("  Shard.active = Shard.allShards()           -- Specify all shards as active")
+print("  Orphans.find('db.collection')              -- Find orphans in a given namespace")
+print("  var results = Orphans.findAll()            -- Find orphans in all namespaces")
+print("  for (ns in results) results[ns].listAll()  -- List details of all orphaned chunks in all namespaces")
+print("  Orphans.removeAll(results)                 -- Removes all orphaned chunks in all namespaces")
 print("")
 print("To remove orphaned documents:")
-print("var result = Orphans.find('db.collection')")
-print("result                            -- Show orphaned chunk details as a cursor")
-print("result.listAll()                  -- List details of all orphaned chunk")
-print("result.listAll(true)              -- List details of all orphaned chunk (pretty print)")
-print("result.hasNext()                  -- Returns true if ns has more orphaned chunks")
-print("result.next()                     -- Shows information about the next orphaned chunk")
-print("result.current()                  -- Shows information about the current orphaned chunk")
-print("result.rewind()                   -- Start iterating from the first orphaned chunk")
-print("result.remove()                   -- Removes the current orphaned chunk")
-print("result.removeAll()                -- Removes all orphaned chunks")
+print("  Shard.active = ...                -- Specify active shards")
+print("  var result = Orphans.find('db.collection')")
+print("  result                            -- Show orphaned chunk details as a cursor")
+print("  result.listAll()                  -- List details of all orphaned chunk")
+print("  result.listAll(true)              -- List details of all orphaned chunk (pretty print)")
+print("  result.hasNext()                  -- Returns true if ns has more orphaned chunks")
+print("  result.next()                     -- Shows information about the next orphaned chunk")
+print("  result.current()                  -- Shows information about the current orphaned chunk")
+print("  result.rewind()                   -- Start iterating from the first orphaned chunk")
+print("  result.remove()                   -- Removes the current orphaned chunk")
+print("  result.removeAll()                -- Removes all orphaned chunks")
 print("")
