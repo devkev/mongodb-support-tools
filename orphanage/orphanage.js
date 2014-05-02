@@ -127,9 +127,9 @@ var Shard = {
 
   // Returns all shards in the system
   allShards: function() {
-    var all = [];
-    db.getSiblingDB("config").shards.find().forEach(function (x) { all.push(x._id) });
-    return all;
+    var shl = []; // shard list
+    this.configDB().shards.find().forEach(function(shard){shl.push(shard._id)});
+    return shl;
   }
 }
 
