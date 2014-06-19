@@ -77,13 +77,13 @@ var Orphanage = {
       var authDoc = this.copyDoc(this.shardAuthDocs[shard._id]);
 
       // if that fails try global auth
-      if (admin.auth(authDoc) != 1 && this.globalAuthDoc){
+      if (admin.auth(authDoc.user, authDoc.pwd) != 1 && this.globalAuthDoc){
         authDoc = this.copyDoc(this.globalAuthDoc);
-        admin.auth(authDoc);
+        admin.auth(authDoc.user, authDoc.pwd);
       }
     } else if (this.globalAuthDoc){
       var authDoc = this.copyDoc(this.globalAuthDoc);
-      admin.auth(authDoc);
+      admin.auth(authDoc.user, authDoc.pwd);
     }
     return conn;
   }
