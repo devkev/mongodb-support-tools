@@ -146,6 +146,13 @@ var Orphans = {
       lastMin: {},
       count: 0,
       shardCounts:{},
+      getids: function(){
+        return this.badChunks.map(function (bchunk) {
+          var naCollection = connections[bchunk.orphanedOn].getCollection(bchunk.ns);
+          bchunk.ids = naCollection.find({}, {_id: 1}).min(bchunk.min).max(bchunk.max).toArray().map(function(d){return d._id});
+          return bchunk;
+        })
+      },
       hasNext: function(){
         if (this.badChunks.length > 0) { return true }
         else { return false }
@@ -159,7 +166,7 @@ var Orphans = {
       remove: function() {
         var bchunk = this.badChunks.splice(0,1)[0]
         print("Removing orphaned chunk " + bchunk._id + " from " + bchunk.orphanedOn)
-        var naCollection = connections[bchunk.orphanedOn].getCollection(namespace)
+        var naCollection = connections[bchunk.orphanedOn].getCollection(bchunk.ns)
         var toRemove = naCollection.find({}, {_id: 1}).min(bchunk.min).max(bchunk.max)
         var idsToRemove = []
 
@@ -191,7 +198,7 @@ var Orphans = {
         if (errorFlag) {
           print("-> There was an error: " + error);
         } else {
-          print("-> Sucessfully removed " + removedCount + " orphaned documents from " + namespace);
+          print("-> Sucessfully removed " + removedCount + " orphaned documents from " + bchunk.ns);
         }
 
         return removedCount;
@@ -255,6 +262,106 @@ var Orphans = {
     } else {
       print("-> No orphans found in [" + namespace  + "]\n")
     }
+    return result
+  },
+  load: function(filename) {
+    // Make sure this script is being run on mongos
+    assert(Shard.configDB().runCommand({ isdbgrid: 1}).ok, "Not a sharded cluster")
+
+    assert(!sh.getBalancerState(), "Balancer must be stopped first")
+    assert(!sh.isBalancerRunning(), "Balancer is still running, wait for it to finish")
+
+    print("Searching for orphans in namespace [" + namespace + "]")
+    var shardConns = Shard.connections()
+    var connections = {};
+
+    var precise = 1;
+    if (typeof bsonWoCompare === 'undefined') {
+        print("bsonWoCompare is undefined. Orphaned document counts might be higher than the actual numbers");
+        print("Try running with mongo shell >2.5.3");
+        precise = 0;
+    }
+
+    // skip shards that have no data yet
+    for(shard in shardConns) {
+        if (shardConns[shard].getCollection(namespace).count() > 0)
+            connections[shard] = shardConns[shard];
+    }
+
+    var result = {
+      parent: this,
+      badChunks: [],
+      getids: function(){
+        return this.badChunks.map(function (bchunk) {
+          var naCollection = connections[bchunk.orphanedOn].getCollection(bchunk.ns);
+          bchunk.ids = naCollection.find({}, {_id: 1}).min(bchunk.min).max(bchunk.max).toArray().map(function(d){return d._id});
+          return bchunk;
+        })
+      },
+      hasNext: function(){
+        if (this.badChunks.length > 0) { return true }
+        else { return false }
+      },
+      next: function() {
+        bchunk = this.badChunks[0]
+//        print("Calling Orphans.remove() will remove " + bchunk.orphanCount +
+//              " orphans from chunk " + bchunk._id + " on " + bchunk.orphanedOn)
+//        print("Documents for this chunk should only exist on " + bchunk.shard)
+      },
+      remove: function() {
+        var bchunk = this.badChunks.splice(0,1)[0]
+        print("Removing orphaned chunk " + bchunk._id + " from " + bchunk.orphanedOn)
+        var naCollection = connections[bchunk.orphanedOn].getCollection(bchunk.ns)
+        var toRemove = naCollection.find({}, {_id: 1}).min(bchunk.min).max(bchunk.max)
+        var idsToRemove = []
+
+        var removedCount = 0;
+        var errorFlag = false;
+
+        while (toRemove.hasNext()) {
+            idsToRemove.push(toRemove.next()._id);
+
+            if (idsToRemove.length >= 100 || (!toRemove.hasNext() && idsToRemove.length > 0)) {
+                if (this.parent._balancerParanoia) {
+                    // if balancer is found to be running we need to start from scratch
+                    assert((!sh.getBalancerState() && !sh.isBalancerRunning()),
+                            "Balancer unexpectedly enabled. Discard previous results and start again.");
+                }
+                naCollection.remove({ _id: { $in: idsToRemove } });
+
+                if (error = naCollection.getDB().getLastError()) {
+                    errorFlag = true;
+                    break;
+                } else {
+                    removedCount += idsToRemove.length;
+                }
+
+                idsToRemove = [];
+            }
+        }
+
+        if (errorFlag) {
+          print("-> There was an error: " + error);
+        } else {
+          print("-> Sucessfully removed " + removedCount + " orphaned documents from " + bchunk.ns);
+        }
+
+        return removedCount;
+      },
+      removeAll: function(secs) {
+          var num = 0;
+          while (this.hasNext()) {
+            num += this.remove()
+            if(secs)
+                sleep(secs * 1000);
+          }
+          return num;
+      }
+    }
+    result.badChunks = eval(cat(filename));
+    assert(result.badChunks instanceof Array, "Error: file " + filename + " does not contain an array");
+
+    print("-> Loaded " + result.badChunks.length + " orphaned chunk details from " + filename  + "\n")
     return result
   },
   findAll: function(){
