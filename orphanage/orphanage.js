@@ -337,6 +337,7 @@ var Orphans = {
   findAll: function(){
     var result = {}
     var namespaces = Shard.namespaces()
+    print("Sharded namespaces:" + tojson(namespaces))
 
     for (i in namespaces) {
       namespace = namespaces[i];
