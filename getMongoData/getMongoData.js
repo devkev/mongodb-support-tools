@@ -67,7 +67,7 @@ function printShardInfo(){
     var configDB = db.getSiblingDB("config");
 
     printInfo("Sharding version",
-              'db.getSiblingDB("config").getCollection("version").findOne()');
+              function(){return db.getSiblingDB("config").getCollection("version").findOne()});
 
     print("\n** Shards:");
     configDB.shards.find().sort({ _id : 1 }).forEach(
@@ -124,69 +124,72 @@ function printShardInfo(){
     );
 }
 
-function printInfo(message, command, printResult) {
-    var result = false;
-    printResult = (printResult === undefined ? true : false);
+function printer(fn, args) {
+    return function() {
+        fn.apply(undefined, args);
+        return __magicNoPrint;
+    };
+}
+
+function printInfo(message, fn, args) {
+    var result;
     print("\n** " + message + ":");
     try {
-        /* jshint evil:true */
-        result = eval(command);
-        /* jshint evil:false */
+        result = fn.apply(undefined, args);
     } catch(err) {
-        print("Error running '" + command + "':");
+        print("Error running '" + fn.toString() + "':");
         print(err);
     }
-    if (printResult) printjson(result);
+    shellPrintHelper(result);
     return result;
 }
 
 function printServerInfo() {
-    printInfo('Shell version',      'version()');
-    printInfo('Shell hostname',     'hostname()');
-    printInfo('db',                 'db');
-    printInfo('Server status info', 'db.serverStatus()');
-    printInfo('Host info',          'db.hostInfo()');
-    printInfo('Command line info',  'db.serverCmdLineOpts()');
-    printInfo('Server build info',  'db.serverBuildInfo()');
+    printInfo('Shell version',      version);
+    printInfo('Shell hostname',     hostname);
+    printInfo('db',                 function(){return db});
+    printInfo('Server status info', function(){return db.serverStatus()});
+    printInfo('Host info',          function(){return db.hostInfo()});
+    printInfo('Command line info',  function(){return db.serverCmdLineOpts()});
+    printInfo('Server build info',  function(){return db.serverBuildInfo()});
 }
 
 function printReplicaSetInfo() {
-    printInfo('Replica set config', 'rs.conf()');
-    printInfo('Replica status',     'rs.status()');
-    printInfo('Replica info',       'db.getReplicationInfo()');
-    printInfo('Replica slave info', 'db.printSlaveReplicationInfo()', false);
-
+    printInfo('Replica set config', function(){return rs.conf()});
+    printInfo('Replica status',     function(){return rs.status()});
+    printInfo('Replica info',       function(){return db.getReplicationInfo()});
+    printInfo('Replica slave info', printer(function(){return db.printSlaveReplicationInfo()}));
 }
 
 function printDataInfo(isMongoS) {
-    var dbs = printInfo('List of databases', 'db.getMongo().getDBs()');
+    var dbs = printInfo('List of databases', function(){return db.getMongo().getDBs()});
 
     dbs.databases.forEach(function(mydb) {
-        var inDB = "db.getSiblingDB('"+ mydb.name + "')";
+        var inDB = db.getSiblingDB(mydb.name);
         var collections = printInfo("List of collections for database '"+ mydb.name +"'",
-                                    inDB + ".getCollectionNames()");
+                                    function(){return inDB.getCollectionNames()});
 
-        printInfo('Database stats (MB)',    inDB + '.stats(1024*1024)');
+        printInfo('Database stats (MB)', function(){return inDB.stats(1024*1024)});
         if (!isMongoS) {
-            printInfo('Database profiler', inDB + '.getProfilingStatus()');
+            printInfo('Database profiler', function(){return inDB.getProfilingStatus()});
         }
 
         collections.forEach(function(col) {
-            var inCol = inDB + ".getCollection('"+ col + "')";
-            printInfo('Collection stats (MB)',   inCol + '.stats(1024*1024)');
+            var inCol = inDB.getCollection(col);
+            printInfo('Collection stats (MB)', function(){return inCol.stats(1024*1024)});
             if (isMongoS) {
-                printInfo('Shard distribution', inCol + '.getShardDistribution()', false);
+                printInfo('Shard distribution', printer(function(){return inCol.getShardDistribution()}));
             }
-            printInfo('Indexes',            inCol + '.getIndexes()');
+            printInfo('Indexes', function(){return inCol.getIndexes()});
             if (col != "system.users") {
-                printInfo('Sample document',    inCol + '.findOne()');
+                printInfo('Sample document', function(){return inCol.findOne()});
             }
         });
     });
 }
 
 function printShardOrReplicaSetInfo() {
-    printInfo('isMaster', 'db.isMaster()');
+    printInfo('isMaster', function(){return db.isMaster()});
     var state;
     var stateInfo = rs.status();
     if (stateInfo.ok) {
@@ -214,8 +217,8 @@ function printShardOrReplicaSetInfo() {
 
 function printAuthInfo() {
     db = db.getSiblingDB('admin');
-    printInfo('Users', 'db.getUsers()');
-    printInfo('Custom roles', 'db.getRoles()');
+    printInfo('Users', function(){return db.getUsers()});
+    printInfo('Custom roles', function(){return db.getRoles()});
 }
 
 
