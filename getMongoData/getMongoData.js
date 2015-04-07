@@ -124,11 +124,20 @@ function printShardInfo(){
     );
 }
 
-function printer(fn, args) {
-    return function() {
-        fn.apply(undefined, args);
-        return __magicNoPrint;
+function unprint(fn, args) {
+    var _print_buffer = [];
+    var __orig_print = print;
+    print = function () {
+        Array.prototype.push.apply(_print_buffer, Array.prototype.slice.call(arguments).join(" ").split("\n"));
     };
+    fn.apply(undefined, args);
+    print = __orig_print;
+    return _print_buffer;
+}
+
+function reprint(a) {
+    a.forEach(function(s){print(s)});
+    return __magicNoPrint;
 }
 
 function printInfo(message, fn, args) {
@@ -158,7 +167,7 @@ function printReplicaSetInfo() {
     printInfo('Replica set config', function(){return rs.conf()});
     printInfo('Replica status',     function(){return rs.status()});
     printInfo('Replica info',       function(){return db.getReplicationInfo()});
-    printInfo('Replica slave info', printer(function(){return db.printSlaveReplicationInfo()}));
+    printInfo('Replica slave info', function(){return reprint(unprint(function(){return db.printSlaveReplicationInfo()}))});
 }
 
 function printDataInfo(isMongoS) {
@@ -178,7 +187,7 @@ function printDataInfo(isMongoS) {
             var inCol = inDB.getCollection(col);
             printInfo('Collection stats (MB)', function(){return inCol.stats(1024*1024)});
             if (isMongoS) {
-                printInfo('Shard distribution', printer(function(){return inCol.getShardDistribution()}));
+                printInfo('Shard distribution', function(){return reprint(unprint(function(){return inCol.getShardDistribution()}))});
             }
             printInfo('Indexes', function(){return inCol.getIndexes()});
             if (col != "system.users") {
