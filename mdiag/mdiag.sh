@@ -804,6 +804,8 @@ shopt -s nullglob
 # Generic/system/distro/boot info
 section args runcommand printeach "$@"
 section date runcommand date
+section hostname runcommand hostname
+section hostname_fqdn runcommand hostname -f
 section whoami runcommand whoami
 section mdiag_upgrade getenvvars inhibit_new_version_check inhibit_version_update updated_from relaunched_from newversion user_elected_no_update update_not_possible user_elected_not_to_run_newversion download_url download_target
 section environment getenvvars PATH LD_LIBRARY_PATH LD_PRELOAD PYTHONPATH PYTHONHOME
