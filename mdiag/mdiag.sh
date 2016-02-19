@@ -143,7 +143,7 @@ done
 ref="$1"
 host="$(hostname)"
 # Deferred to after the definition of _now
-#run="$(_now)"
+#tag="$(_now)"
 
 # FIXME: put everything into a subdir (using mktemp)
 outputbase="${TMPDIR:-/tmp}/mdiag-$host"
@@ -299,7 +299,7 @@ function _now {
 	date -Ins | sed -e 's/,\([0-9]\{3\}\)[0-9]\{6\}/.\1/'
 }
 
-run="$(_now)"
+tag="$(_now)"
 
 function _graboutput {
 	exec >> "$outfile" 2>> "$errfile"
@@ -460,7 +460,7 @@ function _emit_json {
 	{
 	echo "\"ref\" : $ref_json"
 	echo "\"host\" : $host_json"
-	echo "\"run\" : $run_json"
+	echo "\"tag\" : $tag_json"
 	echo "\"version\" : $version_json"
 	echo "\"section\" : $(_jsonify string "$section")"
 	if [ "$subsection" ]; then
@@ -503,7 +503,7 @@ function _output_preamble_json {
 	# Static strings that don't change
 	ref_json="$(_jsonify string "$ref")"
 	host_json="$(_jsonify string "$host")"
-	run_json="$(_jsonify date "$run")"
+	tag_json="$(_jsonify date "$tag")"
 	version_json="$(_jsonify string "$version")"
 
 	echo '[' >> "$1"
