@@ -891,9 +891,13 @@ section netstat runcommand netstat -anpoe
 
 # Network time info
 section ntp getfiles /etc/ntp.conf
+section ntp subsection chkconfig runcommand chkconfig --list ntpd
 section ntp subsection status runcommand ntpstat
 section ntp subsection peers runcommand ntpq -p
 section ntp subsection peers_n runcommand ntpq -pn
+section chronyc subsection tracking runcommand chronyc tracking
+section chronyc subsection sources runcommand chronyc sources
+section chronyc subsection sourcestats runcommand chronyc sourcestats
 
 # Hardware info
 section dmesg runcommand dmesg
