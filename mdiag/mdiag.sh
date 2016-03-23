@@ -45,6 +45,7 @@
 
 
 version="2.0.0-pre3"
+revdate="2016-03-23"
 
 PATH="$PATH${PATH+:}/usr/sbin:/sbin:/usr/bin:/bin"
 
@@ -638,6 +639,16 @@ function printeach0file {
 	done
 }
 
+function fingerprint {
+	ts="$(_now)"
+	_addfield string "script" "mdiag.sh"
+	_addfield string "revdate" "$revdate"
+	_addfield string "os" "$(uname -o)"
+	_addfield string "shell" "$SHELL"
+	_addfield string "scriptversion" "$version"
+	_emit
+}
+
 function getenvvars {
 	local i
 	for i; do
@@ -802,6 +813,7 @@ shopt -s nullglob
 
 
 # Generic/system/distro/boot info
+section fingerprint fingerprint
 section args runcommand printeach "$@"
 section date runcommand date
 section hostname runcommand hostname
