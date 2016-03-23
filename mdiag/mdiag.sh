@@ -77,7 +77,7 @@ validoutputformat[txt]=txt
 validoutputformat[text]=txt
 validoutputformat[json]=json
 
-outputformat=txt
+outputformat=json
 inhibit_new_version_check=n
 inhibit_version_update=n
 
