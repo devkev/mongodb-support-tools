@@ -244,15 +244,15 @@ if [ "$inhibit_new_version_check" != y ]; then
 			fi
 			# If we get here, either user said not to replace $0, or no write permission.
 			# Offer to run the new version anyway.
-			read_ynq "Relaunch new version of mdiag.sh"
+			read_ynq "Use new version of mdiag.sh without updating"
 			case "$REPLY" in
 				[Yy]|"")
-					echo "Relaunching new version of $0..."
+					echo "Using new version of $0..."
 					echo
 					exec bash "$download_target" --internal-relaunched-from "$version" "$@"
 					;;
 				[Nn])
-					echo "Not relaunching new version $newversion, continuing with existing version $version..."
+					echo "Not using new version $newversion, continuing with existing version $version..."
 					user_elected_not_to_run_newversion=y
 					;;
 			esac
