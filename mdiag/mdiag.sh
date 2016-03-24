@@ -49,6 +49,13 @@ revdate="2016-03-23"
 
 PATH="$PATH${PATH+:}/usr/sbin:/sbin:/usr/bin:/bin"
 
+_os="`uname -o`"
+if test "$_os" != "GNU/Linux"; then
+	echo "mdiag.sh: Error: Unsupported Operating System: $_os"
+	echo "mdiag.sh: Supported Operating Systems are: Linux"
+	exit 1
+fi
+
 function showversion {
 	echo "mdiag.sh: MongoDB System Diagnostic Information Gathering Tool"
 	echo "version $version, copyright (c) 2014-2016, MongoDB, Inc."
@@ -645,7 +652,7 @@ function fingerprint {
 	ts="$(_now)"
 	_addfield string "script" "mdiag.sh"
 	_addfield string "revdate" "$revdate"
-	_addfield string "os" "$(uname -o)"
+	_addfield string "os" "$_os"
 	_addfield string "shell" "$SHELL"
 	_addfield string "scriptversion" "$version"
 	_emit
