@@ -310,12 +310,14 @@ function _ungraboutput {
 	exec 1>&3 2>&4
 }
 
+_lf="$(echo -ne '\r')"
+
 function _json_strings_arrayify {
 	local a=("$@")
 	a=("${a[@]//\\/\\\\}") # this fixes vim syntax highlighting -> "
 	a=("${a[@]//\"/\\\"}")
 	a=("${a[@]//	/\\t}")
-	a=("${a[@]///\\r}")
+	a=("${a[@]//$_lf/\\r}")
 	a=("${a[@]/#/\"}")
 	a=("${a[@]/%/\",}")
 	a[$(( ${#a[@]} - 1 ))]="${a[$(( ${#a[@]} - 1 ))]%,}"
@@ -327,7 +329,7 @@ function _json_stringify {
 	s="${s//\\/\\\\}" # this fixes vim syntax highlighting -> "
 	s="${s//\"/\\\"}"
 	s="${s//	/\\t}"
-	s="${s///\\r}"
+	s="${s//$_lf/\\r}"
 	echo "\"$s\""
 }
 
