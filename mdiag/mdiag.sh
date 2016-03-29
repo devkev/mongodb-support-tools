@@ -200,18 +200,23 @@ function read_ynq {
 	esac
 }
 
+function clean_download_target {
+	rm -f "$download_target"
+}
+
 # Check for new version
-if [ "$inhibit_new_version_check" != y ]; then
+if [ "$inhibit_new_version_check" != y -a "$updated_from" = "" -a "$relaunched_from" = "" ]; then
 	download_url='https://raw.githubusercontent.com/mongodb/support-tools/master/mdiag/mdiag.sh'
 	# FIXME: put this (and everything) into an $outputbase-based subdir
 	download_target="$outputbase-$$-mdiag.sh"
 	# first try wget, then try curl, then give up
 	echo "Checking for a newer version of mdiag.sh..."
-	rm -f "$download_target"   # remove any old version
+	trap clean_download_target EXIT   # don't leak downloaded script on shell exit
+	clean_download_target   # remove any old version
 	if ! wget --quiet --tries 1 --timeout 10 --output-document "$download_target" "$download_url"; then
-		rm -f "$download_target"   # get rid of any partial download
+		clean_download_target   # get rid of any partial download
 		if ! curl --silent --retry 0 --connect-timeout 10 --max-time 120 --output "$download_target" "$download_url"; then
-			rm -f "$download_target"   # get rid of any partial download
+			clean_download_target   # get rid of any partial download
 			echo "Warning: Unable to check for a newer version."
 		fi
 	fi
@@ -238,10 +243,15 @@ if [ "$inhibit_new_version_check" != y ]; then
 						echo "Updating $0 to version $newversion..."
 						# Using cat like this will preserve ownership, permissions, etc.
 						# Important since we might (should) be running as root.
-						cat "$download_target" > "$0"
-						echo "Relaunching new version of $0..."
-						echo
-						exec bash "$0" --internal-updated-from "$version" "$@"
+						if cat "$download_target" > "$0"; then
+							echo "Launching updated version of $0..."
+							echo
+							clean_download_target   # trap EXIT doesn't fire on exec
+							exec bash "$0" --internal-updated-from "$version" "$@"
+						else
+							echo "Error updating $0 to new version..."
+							exit 1
+						fi
 						;;
 					[Nn])
 						echo "Not updating to $0"
@@ -254,9 +264,12 @@ if [ "$inhibit_new_version_check" != y ]; then
 			read_ynq "Use new version of mdiag.sh without updating"
 			case "$REPLY" in
 				[Yy]|"")
-					echo "Using new version of $0..."
+					echo "Running new version without updating $0..."
 					echo
-					exec bash "$download_target" --internal-relaunched-from "$version" "$@"
+					bash "$download_target" --internal-relaunched-from "$version" "$@"
+					_rc=$?
+					clean_download_target
+					exit $_rc
 					;;
 				[Nn])
 					echo "Not using new version $newversion, continuing with existing version $version..."
