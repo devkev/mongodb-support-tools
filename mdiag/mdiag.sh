@@ -51,7 +51,7 @@ PATH="$PATH${PATH+:}/usr/sbin:/sbin:/usr/bin:/bin"
 
 _os="`uname -o`"
 if test "$_os" != "GNU/Linux"; then
-	echo "mdiag.sh: Error: Unsupported Operating System: $_os"
+	echo "mdiag.sh: ERROR: Unsupported Operating System: $_os"
 	echo "mdiag.sh: Supported Operating Systems are: Linux"
 	exit 1
 fi
@@ -66,10 +66,10 @@ function showhelp {
 	showversion
 	echo ""
 	echo "Usage:"
-	echo "    sudo bash mdiag.sh [options] <ticket>"
+	echo "    sudo bash mdiag.sh [options] <reference>"
 	echo ""
 	echo "Parameters:"
-	echo "    <ticket>         Ticket reference, e.g. CS-12435"
+	echo "    <reference>      Reference to ticket, e.g. CS-12435 (required)"
 	echo "    --format <fmt>   Output in given format (txt or json)"
 	echo "    --txt, --text    Output in legacy plain text format"
 	echo "    --json           Output in JSON format"
@@ -77,6 +77,14 @@ function showhelp {
 	echo "    --help, -h       Show this help"
 	echo "    --version, -v    Show the mdiag.sh version"
 	echo ""
+}
+
+function user_error_fatal {
+	echo ""
+	echo "mdiag.sh: ERROR: $*"
+	echo "Run \"bash mdiag.sh --help\" for help."
+	echo ""
+	exit 1
 }
 
 declare -A validoutputformat
@@ -107,11 +115,7 @@ while [ "${1%%-*}" = "" -a "x$1" != "x" ]; do
 					auto_answer=""  # simulates pressing Enter
 					;;
 				*)
-					echo ""
-					echo "mdiag.sh: ERROR: unknown value for --answer: \"$1\""
-					echo "Run \"bash mdiag.sh --help\" for help."
-					echo ""
-					exit 1
+					user_error_fatal "unknown value for --answer: \"$1\""
 					;;
 			esac
 			;;
@@ -138,11 +142,7 @@ while [ "${1%%-*}" = "" -a "x$1" != "x" ]; do
 			exit 0
 			;;
 		*)
-			echo ""
-			echo "mdiag.sh: ERROR: unknown parameter \"$1\""
-			echo "Run \"bash mdiag.sh --help\" for help."
-			echo ""
-			exit 1
+			user_error_fatal "unknown parameter \"$1\""
 			;;
 	esac
 	shift
@@ -152,6 +152,16 @@ ref="$1"
 host="$(hostname)"
 # Deferred to after the definition of _now
 #tag="$(_now)"
+
+if [ "$ref" = "" ]; then
+	user_error_fatal "Reference must be supplied."
+fi
+
+case "$ref" in
+	CS-*|SUPPORT-*|MMSSUPPORT-*)
+		ticket_url="https://jira.mongodb.org/browse/$ref"
+		;;
+esac
 
 # FIXME: put everything into a subdir (using mktemp)
 outputbase="${TMPDIR:-/tmp}/mdiag-$host"
@@ -249,7 +259,7 @@ if [ "$inhibit_new_version_check" != y -a "$updated_from" = "" -a "$relaunched_f
 							clean_download_target   # trap EXIT doesn't fire on exec
 							exec bash "$0" --internal-updated-from "$version" "$@"
 						else
-							echo "Error updating $0 to new version..."
+							echo "mdiag.sh: ERROR: failed to update $0 to new version..."
 							exit 1
 						fi
 						;;
@@ -285,11 +295,7 @@ fi
 if [ "${validoutputformat["$outputformat"]:+set}" = "set" ]; then
 	outputformat="${validoutputformat["$outputformat"]}"
 else
-	echo ""
-	echo "mdiag.sh: ERROR: unsupported output format \"$outputformat\""
-	echo "Run \"bash mdiag.sh --help\" for help."
-	echo ""
-	exit 1
+	user_error_fatal "unsupported output format \"$outputformat\""
 fi
 
 numoutputs=0
@@ -814,10 +820,11 @@ function lsfiles {
 ##################################################################################
 
 
-if [ "$ref" ]; then
-	echo "Ticket: https://jira.mongodb.org/browse/$ref"
-	echo
+echo "Reference: $ref"
+if [ "$ticket_url" ]; then
+	echo "Ticket URL: $ticket_url"
 fi
+echo
 echo "Please wait while diagnostic information is gathered"
 echo "into the $finaloutput file..."
 echo
@@ -1000,9 +1007,12 @@ _finish
 cat <<EOF
 
 ==============================================================
-MongoDB Diagnostic information has been recorded in: $finaloutput
-Please attach the contents of $finaloutput to the Jira ticket${ref:+ at:
-    https://jira.mongodb.org/browse/$ref}
+MongoDB diagnostic information has been recorded in the file:
+
+    $finaloutput
+
+Please upload that file to the ticket${ticket_url:+ at:
+    $ticket_url}
 ==============================================================
 
 EOF
