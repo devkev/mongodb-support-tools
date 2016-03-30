@@ -66,10 +66,10 @@ function showhelp {
 	showversion
 	echo ""
 	echo "Usage:"
-	echo "    sudo bash mdiag.sh [options] <reference>"
+	echo "    sudo bash mdiag.sh [options] [reference]"
 	echo ""
 	echo "Parameters:"
-	echo "    <reference>      Reference to ticket, e.g. CS-12435 (required)"
+	echo "    [reference]      Reference to ticket, e.g. CS-12435"
 	echo "    --format <fmt>   Output in given format (txt or json)"
 	echo "    --txt, --text    Output in legacy plain text format"
 	echo "    --json           Output in JSON format"
@@ -153,10 +153,6 @@ host="$(hostname)"
 # Deferred to after the definition of _now
 #tag="$(_now)"
 
-if [ "$ref" = "" ]; then
-	user_error_fatal "Reference must be supplied."
-fi
-
 case "$ref" in
 	CS-*|SUPPORT-*|MMSSUPPORT-*)
 		ticket_url="https://jira.mongodb.org/browse/$ref"
@@ -171,6 +167,15 @@ echo "MongoDB Diagnostic Report"
 echo "mdiag.sh version $version"
 echo "========================="
 echo
+
+if [ "$ref" = "" ]; then
+	user_error_fatal "Reference must be supplied."
+
+	echo "WARNING: No reference has been supplied.  If you have a ticket number or other"
+	echo "reference, you should re-run mdiag.sh and pass it on the command line."
+	echo "Run \"bash mdiag.sh --help\" for help."
+	echo
+fi
 
 function read_ynq {
 	local msg="$1"
@@ -839,11 +844,13 @@ function lsfiles {
 ##################################################################################
 
 
-echo "Reference: $ref"
-if [ "$ticket_url" ]; then
-	echo "Ticket URL: $ticket_url"
+if [ "$ref" ]; then
+	echo "Reference: $ref"
+	if [ "$ticket_url" ]; then
+		echo "Ticket URL: $ticket_url"
+	fi
+	echo
 fi
-echo
 echo "Please wait while diagnostic information is gathered"
 echo "into the $finaloutput file..."
 echo
