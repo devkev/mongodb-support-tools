@@ -169,8 +169,6 @@ echo "========================="
 echo
 
 if [ "$ref" = "" ]; then
-	user_error_fatal "Reference must be supplied."
-
 	echo "WARNING: No reference has been supplied.  If you have a ticket number or other"
 	echo "reference, you should re-run mdiag.sh and pass it on the command line."
 	echo "Run \"bash mdiag.sh --help\" for help."
