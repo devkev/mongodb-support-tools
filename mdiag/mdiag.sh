@@ -375,7 +375,11 @@ function _now {
 	date -Ins | sed -e 's/,\([0-9]\{3\}\)[0-9]\{6\}/.\1/'
 }
 
-tag="$(_now)"
+function create_tag {
+	declare -g tag="$(_now)"
+}
+
+create_tag
 
 function _graboutput {
 	exec >> "$outfile" 2>> "$errfile"
