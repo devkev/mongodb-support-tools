@@ -87,11 +87,6 @@ function user_error_fatal {
 	exit 1
 }
 
-declare -A validoutputformat
-validoutputformat[txt]=txt
-validoutputformat[text]=txt
-validoutputformat[json]=json
-
 function set_defaults {
 	declare -g outputformat=json
 	declare -g inhibit_new_version_check=n
@@ -321,6 +316,11 @@ if [ "$inhibit_new_version_check" != y -a "$updated_from" = "" -a "$relaunched_f
 	echo
 fi
 
+
+declare -A validoutputformat
+validoutputformat[txt]=txt
+validoutputformat[text]=txt
+validoutputformat[json]=json
 
 if [ "${validoutputformat["$outputformat"]:+set}" = "set" ]; then
 	outputformat="${validoutputformat["$outputformat"]}"
