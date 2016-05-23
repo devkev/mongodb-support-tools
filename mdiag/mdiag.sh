@@ -175,12 +175,16 @@ function print_header {
 
 print_header
 
-if [ "$ref" = "" ]; then
-	echo "WARNING: No reference has been supplied.  If you have a ticket number or other"
-	echo "reference, you should re-run mdiag.sh and pass it on the command line."
-	echo "Run \"bash mdiag.sh --help\" for help."
-	echo
-fi
+function check_for_ref {
+	if [ "$ref" = "" ]; then
+		echo "WARNING: No reference has been supplied.  If you have a ticket number or other"
+		echo "reference, you should re-run mdiag.sh and pass it on the command line."
+		echo "Run \"bash mdiag.sh --help\" for help."
+		echo
+	fi
+}
+
+check_for_ref
 
 function read_ynq {
 	local msg="$1"
