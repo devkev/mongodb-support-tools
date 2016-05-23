@@ -243,78 +243,82 @@ function get_with_curl {
 }
 
 # Check for new version
-if [ "$inhibit_new_version_check" != y -a "$updated_from" = "" -a "$relaunched_from" = "" ]; then
-	download_url='https://raw.githubusercontent.com/mongodb/support-tools/master/mdiag/mdiag.sh'
-	# FIXME: put this (and everything) into an $outputbase-based subdir
-	download_target="$outputbase-$$-mdiag.sh"
-	trap clean_download_target EXIT   # don't leak downloaded script on shell exit
-	echo "Checking for a newer version of mdiag.sh..."
-	# first try wget, then try curl, then give up
-	if ! get_with_wget; then
-		if ! get_with_curl; then
-			echo "Warning: Unable to check for a newer version."
-		fi
-	fi
-	if [ -s "$download_target" ]; then
-		if cmp -s "$0" "$download_target"; then
-			echo "No new version available."
-		else
-			newversion="$(sed -e '/^version="/{s/"$//;s/^.*"//;q}' -e 'd' "$download_target")"
-			if [ "$newversion" = "" ]; then
-				newversion="(unknown)"
+function check_for_new_version {
+	if [ "$inhibit_new_version_check" != y -a "$updated_from" = "" -a "$relaunched_from" = "" ]; then
+		declare -g download_url='https://raw.githubusercontent.com/mongodb/support-tools/master/mdiag/mdiag.sh'
+		# FIXME: put this (and everything) into an $outputbase-based subdir
+		declare -g download_target="$outputbase-$$-mdiag.sh"
+		trap clean_download_target EXIT   # don't leak downloaded script on shell exit
+		echo "Checking for a newer version of mdiag.sh..."
+		# first try wget, then try curl, then give up
+		if ! get_with_wget; then
+			if ! get_with_curl; then
+				echo "Warning: Unable to check for a newer version."
 			fi
-			echo "NEW VERSION FOUND: $newversion"
-			echo
-			if [ "$inhibit_version_update" = y ]; then
-				echo "Warning: Auto version update $0 not possible (user-inhibited)"
-				update_not_possible=y
-			elif [ ! -w "$0" ]; then
-				echo "Warning: Auto version update $0 not possible (no write permission)"
-				update_not_possible=y
+		fi
+		if [ -s "$download_target" ]; then
+			if cmp -s "$0" "$download_target"; then
+				echo "No new version available."
 			else
-				read_ynq "Update $0 to this version"
+				declare -g newversion="$(sed -e '/^version="/{s/"$//;s/^.*"//;q}' -e 'd' "$download_target")"
+				if [ "$newversion" = "" ]; then
+					newversion="(unknown)"
+				fi
+				echo "NEW VERSION FOUND: $newversion"
+				echo
+				if [ "$inhibit_version_update" = y ]; then
+					echo "Warning: Auto version update $0 not possible (user-inhibited)"
+					declare -g update_not_possible=y
+				elif [ ! -w "$0" ]; then
+					echo "Warning: Auto version update $0 not possible (no write permission)"
+					declare -g update_not_possible=y
+				else
+					read_ynq "Update $0 to this version"
+					case "$REPLY" in
+						[Yy]|"")
+							echo "Updating $0 to version $newversion..."
+							# Using cat like this will preserve ownership, permissions, etc.
+							# Important since we might (should) be running as root.
+							if cat "$download_target" > "$0"; then
+								echo "Launching updated version of $0..."
+								echo
+								clean_download_target   # trap EXIT doesn't fire on exec
+								exec bash "$0" --internal-updated-from "$version" "$@"
+							else
+								echo "mdiag.sh: ERROR: failed to update $0 to new version..."
+								exit 1
+							fi
+							;;
+						[Nn])
+							echo "Not updating to $0"
+							declare -g user_elected_no_update=y
+							;;
+					esac
+				fi
+				# If we get here, either user said not to replace $0, or no write permission.
+				# Offer to run the new version anyway.
+				read_ynq "Use new version of mdiag.sh without updating"
 				case "$REPLY" in
 					[Yy]|"")
-						echo "Updating $0 to version $newversion..."
-						# Using cat like this will preserve ownership, permissions, etc.
-						# Important since we might (should) be running as root.
-						if cat "$download_target" > "$0"; then
-							echo "Launching updated version of $0..."
-							echo
-							clean_download_target   # trap EXIT doesn't fire on exec
-							exec bash "$0" --internal-updated-from "$version" "$@"
-						else
-							echo "mdiag.sh: ERROR: failed to update $0 to new version..."
-							exit 1
-						fi
+						echo "Running new version without updating $0..."
+						echo
+						bash "$download_target" --internal-relaunched-from "$version" "$@"
+						local _rc=$?
+						clean_download_target
+						exit $_rc
 						;;
 					[Nn])
-						echo "Not updating to $0"
-						user_elected_no_update=y
+						echo "Not using new version $newversion, continuing with existing version $version..."
+						declare -g user_elected_not_to_run_newversion=y
 						;;
 				esac
 			fi
-			# If we get here, either user said not to replace $0, or no write permission.
-			# Offer to run the new version anyway.
-			read_ynq "Use new version of mdiag.sh without updating"
-			case "$REPLY" in
-				[Yy]|"")
-					echo "Running new version without updating $0..."
-					echo
-					bash "$download_target" --internal-relaunched-from "$version" "$@"
-					_rc=$?
-					clean_download_target
-					exit $_rc
-					;;
-				[Nn])
-					echo "Not using new version $newversion, continuing with existing version $version..."
-					user_elected_not_to_run_newversion=y
-					;;
-			esac
 		fi
+		echo
 	fi
-	echo
-fi
+}
+
+check_for_new_version
 
 
 declare -A validoutputformat
