@@ -326,11 +326,15 @@ validoutputformat[txt]=txt
 validoutputformat[text]=txt
 validoutputformat[json]=json
 
-if [ "${validoutputformat["$outputformat"]:+set}" = "set" ]; then
-	outputformat="${validoutputformat["$outputformat"]}"
-else
-	user_error_fatal "unsupported output format \"$outputformat\""
-fi
+function check_valid_output_format {
+	if [ "${validoutputformat["$outputformat"]:+set}" = "set" ]; then
+		declare -g outputformat="${validoutputformat["$outputformat"]}"
+	else
+		user_error_fatal "unsupported output format \"$outputformat\""
+	fi
+}
+
+check_valid_output_format
 
 numoutputs=0
 
