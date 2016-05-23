@@ -165,11 +165,15 @@ esac
 # FIXME: put everything into a subdir (using mktemp)
 outputbase="${TMPDIR:-/tmp}/mdiag-$host"
 
-echo "========================="
-echo "MongoDB Diagnostic Report"
-echo "mdiag.sh version $version"
-echo "========================="
-echo
+function print_header {
+	echo "========================="
+	echo "MongoDB Diagnostic Report"
+	echo "mdiag.sh version $version"
+	echo "========================="
+	echo
+}
+
+print_header
 
 if [ "$ref" = "" ]; then
 	echo "WARNING: No reference has been supplied.  If you have a ticket number or other"
