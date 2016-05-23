@@ -874,193 +874,195 @@ function lsfiles {
 ##################################################################################
 
 
-if [ "$ref" ]; then
-	echo "Reference: $ref"
-	if [ "$ticket_url" ]; then
-		echo "Ticket URL: $ticket_url"
+function _main {
+
+	if [ "$ref" ]; then
+		echo "Reference: $ref"
+		if [ "$ticket_url" ]; then
+			echo "Ticket URL: $ticket_url"
+		fi
+		echo
 	fi
+	echo "Please wait while diagnostic information is gathered"
+	echo "into the $finaloutput file..."
 	echo
-fi
-echo "Please wait while diagnostic information is gathered"
-echo "into the $finaloutput file..."
-echo
-echo "If the display remains stuck for more than 5 minutes,"
-echo "please press Control-C."
-echo
+	echo "If the display remains stuck for more than 5 minutes,"
+	echo "please press Control-C."
+	echo
 
 
-_output_preamble
+	_output_preamble
 
-shopt -s nullglob
-
-
-##################################################################################
+	shopt -s nullglob
 
 
-# Generic/system/distro/boot info
-section fingerprint fingerprint
-section args runcommand printeach "$@"
-section date runcommand date
-section hostname runcommand hostname
-section hostname_fqdn runcommand hostname -f
-section whoami runcommand whoami
-section mdiag_upgrade getenvvars inhibit_new_version_check inhibit_version_update updated_from relaunched_from newversion user_elected_no_update update_not_possible user_elected_not_to_run_newversion download_url download_target
-section environment getenvvars PATH LD_LIBRARY_PATH LD_PRELOAD PYTHONPATH PYTHONHOME
-section distro getfiles /etc/*release /etc/*version
-section uname runcommand uname -a
-section glibc runcommand lsfiles /lib*/libc.so* /lib/*/libc.so*
-section glibc2 runcommand eval "/lib*/libc.so* || /lib/*/libc.so*"
-section ld.so.conf getfiles /etc/ld.so.conf /etc/ld.so.conf.d/*
-section lsb runcommand lsb_release -a
-section rc.local getfiles /etc/rc.local
-section sysctl runcommand sysctl -a
-section sysctl.conf getfiles /etc/sysctl.conf /etc/sysctl.d/*
-section ulimit runcommand ulimit -a
-section limits.conf getfiles /etc/security/limits.conf /etc/security/limits.d/*
-section selinux runcommand sestatus
-section uptime runcommand uptime
-section boot runcommand who -b
-section runlevel runcommand who -r
-section clock_change runcommand who -t
-section timezone_config getfiles /etc/timezone /etc/sysconfig/clock
-section timedatectl runcommand timedatectl
-section localtime runcommand lsfiles /etc/localtime
-section localtime_matches runcommand find /usr/share/zoneinfo -type f -exec cmp -s \{\} /etc/localtime \; -print
-section clocksource getfiles /sys/devices/system/clocksource/clocksource*/{current,available}_clocksource
+	##################################################################################
 
-section chkconfig_list runcommand chkconfig --list
-section initctl_list runcommand initctl list
 
-# Block device/filesystem info
-section scsi getfiles /proc/scsi/scsi
-section blockdev runcommand blockdev --report
-section lsblk runcommand lsblk
+	# Generic/system/distro/boot info
+	section fingerprint fingerprint
+	section args runcommand printeach "$@"
+	section date runcommand date
+	section hostname runcommand hostname
+	section hostname_fqdn runcommand hostname -f
+	section whoami runcommand whoami
+	section mdiag_upgrade getenvvars inhibit_new_version_check inhibit_version_update updated_from relaunched_from newversion user_elected_no_update update_not_possible user_elected_not_to_run_newversion download_url download_target
+	section environment getenvvars PATH LD_LIBRARY_PATH LD_PRELOAD PYTHONPATH PYTHONHOME
+	section distro getfiles /etc/*release /etc/*version
+	section uname runcommand uname -a
+	section glibc runcommand lsfiles /lib*/libc.so* /lib/*/libc.so*
+	section glibc2 runcommand eval "/lib*/libc.so* || /lib/*/libc.so*"
+	section ld.so.conf getfiles /etc/ld.so.conf /etc/ld.so.conf.d/*
+	section lsb runcommand lsb_release -a
+	section rc.local getfiles /etc/rc.local
+	section sysctl runcommand sysctl -a
+	section sysctl.conf getfiles /etc/sysctl.conf /etc/sysctl.d/*
+	section ulimit runcommand ulimit -a
+	section limits.conf getfiles /etc/security/limits.conf /etc/security/limits.d/*
+	section selinux runcommand sestatus
+	section uptime runcommand uptime
+	section boot runcommand who -b
+	section runlevel runcommand who -r
+	section clock_change runcommand who -t
+	section timezone_config getfiles /etc/timezone /etc/sysconfig/clock
+	section timedatectl runcommand timedatectl
+	section localtime runcommand lsfiles /etc/localtime
+	section localtime_matches runcommand find /usr/share/zoneinfo -type f -exec cmp -s \{\} /etc/localtime \; -print
+	section clocksource getfiles /sys/devices/system/clocksource/clocksource*/{current,available}_clocksource
 
-section udev_disks
-	runcommands
-		awk '{ $0 = $4 } /^[sh]d[a-z]+$/' /proc/partitions | xargs -n1 --no-run-if-empty udevadm info --query all --name
-	endruncommands
-endsection
+	section chkconfig_list runcommand chkconfig --list
+	section initctl_list runcommand initctl list
 
-section fstab getfiles /etc/fstab
-section mount runcommand mount
-section df-h runcommand df -h
-section df-k runcommand df -k
+	# Block device/filesystem info
+	section scsi getfiles /proc/scsi/scsi
+	section blockdev runcommand blockdev --report
+	section lsblk runcommand lsblk
 
-section mdstat getfiles /proc/mdstat
-section mdadm_detail_scan runcommand mdadm --detail --scan
-section mdadm_detail
-	runcommands
-		sed -ne 's,^\(md[0-9]\+\) : .*$,/dev/\1,p' < /proc/mdstat | xargs -n1 --no-run-if-empty mdstat --detail
-	endruncommands
-endsection
-
-section dmsetup runcommand dmsetup ls
-section device_mapper runcommand lsfiles -R /dev/mapper /dev/dm-*
-
-section lvm subsection pvs runcommand pvs -v
-section lvm subsection vgs runcommand vgs -v
-section lvm subsection lvs runcommand lvs -v
-section lvm subsection pvdisplay runcommand pvdisplay -m
-section lvm subsection vgdisplay runcommand vgdisplay -v
-section lvm subsection lvdisplay runcommand lvdisplay -am
-
-section nr_requests getfilesfromcommand find /sys -name nr_requests
-section read_ahead_kb getfilesfromcommand find /sys -name read_ahead_kb
-section scheduler getfilesfromcommand find /sys -name scheduler
-section rotational getfilesfromcommand find /sys -name rotational
-
-# Network info
-section ifconfig runcommand ifconfig -a
-section route runcommand route -n
-section iptables runcommand iptables -L -v -n
-section iptables_nat runcommand iptables -t nat -L -v -n
-section ip_link runcommand ip link
-section ip_addr runcommand ip addr
-section ip_route runcommand ip route
-section ip_rule runcommand ip rule
-section ip_neigh runcommand ip neigh
-section hosts getfiles /etc/hosts
-section host.conf getfiles /etc/host.conf
-section resolv getfiles /etc/resolv.conf
-section nsswitch getfiles /etc/nsswitch.conf
-section networks getfiles /etc/networks
-section rpcinfo runcommand rpcinfo -p
-section netstat runcommand netstat -anpoe
-
-# Network time info
-section ntp getfiles /etc/ntp.conf
-section ntp subsection chkconfig runcommand chkconfig --list ntpd
-section ntp subsection status runcommand ntpstat
-section ntp subsection peers runcommand ntpq -p
-section ntp subsection peers_n runcommand ntpq -pn
-section chronyc subsection tracking runcommand chronyc tracking
-section chronyc subsection sources runcommand chronyc sources
-section chronyc subsection sourcestats runcommand chronyc sourcestats
-
-# Hardware info
-section dmesg runcommand dmesg
-section lspci runcommand lspci -vvv
-section dmidecode runcommand dmidecode --type memory
-section sensors runcommand sensors
-section mcelog getfiles /var/log/mcelog
-
-# Numa settings
-section numactl subsection command runcommand which numactl
-section numactl subsection hardware runcommand numactl --hardware
-section numactl subsection show runcommand numactl --show
-
-# Process/kernel info
-section procinfo getfiles /proc/mounts /proc/self/mountinfo /proc/cpuinfo /proc/meminfo /proc/zoneinfo /proc/swaps /proc/modules /proc/vmstat /proc/loadavg /proc/uptime /proc/cgroups /proc/partitions
-section transparent_hugepage getfilesfromcommand find /sys/kernel/mm/{redhat_,}transparent_hugepage -type f
-section ps runcommand ps -eLFww
-
-# Dynamic/monitoring info
-section top
-runcommands
-COLUMNS=512 top -b -d 1 -n 30 -c | sed -e 's/ *$//g'
-endruncommands
-endsection
-section top_threads
-runcommands
-COLUMNS=512 top -b -d 1 -n 30 -c -H | sed -e 's/ *$//g'
-endruncommands
-endsection
-section iostat runcommand iostat -xtm 1 120
-
-# Mongo process info
-mongo_pids="`pgrep mongo`"
-section mongo_summary runcommand ps -Fww -p $mongo_pids
-for pid in $mongo_pids; do
-	section proc/$pid
-		runcommand lsfiles /proc/$pid/cmdline
-		subsection cmdline runcommand printeach0file /proc/$pid/cmdline
-		printeach0file /proc/$pid/cmdline | awk '$0 == "-f" || $0 == "--config" { getline; print; }' | getstdinfiles
-		getfiles /proc/$pid/limits /proc/$pid/mounts /proc/$pid/mountinfo /proc/$pid/smaps /proc/$pid/numa_maps
-		subsection /proc/$pid/fd runcommand lsfiles /proc/$pid/fd
-		subsection /proc/$pid/fdinfo runcommand lsfiles /proc/$pid/fdinfo
-		getfiles /proc/$pid/cgroup
+	section udev_disks
+		runcommands
+			awk '{ $0 = $4 } /^[sh]d[a-z]+$/' /proc/partitions | xargs -n1 --no-run-if-empty udevadm info --query all --name
+		endruncommands
 	endsection
-done
-section global_mongodb_conf getfiles /etc/mongodb.conf /etc/mongod.conf
-section global_mms_conf getfiles /etc/mongodb-mms/*
 
-# Hardware info with a risk of hanging
-section smartctl
+	section fstab getfiles /etc/fstab
+	section mount runcommand mount
+	section df-h runcommand df -h
+	section df-k runcommand df -k
+
+	section mdstat getfiles /proc/mdstat
+	section mdadm_detail_scan runcommand mdadm --detail --scan
+	section mdadm_detail
+		runcommands
+			sed -ne 's,^\(md[0-9]\+\) : .*$,/dev/\1,p' < /proc/mdstat | xargs -n1 --no-run-if-empty mdstat --detail
+		endruncommands
+	endsection
+
+	section dmsetup runcommand dmsetup ls
+	section device_mapper runcommand lsfiles -R /dev/mapper /dev/dm-*
+
+	section lvm subsection pvs runcommand pvs -v
+	section lvm subsection vgs runcommand vgs -v
+	section lvm subsection lvs runcommand lvs -v
+	section lvm subsection pvdisplay runcommand pvdisplay -m
+	section lvm subsection vgdisplay runcommand vgdisplay -v
+	section lvm subsection lvdisplay runcommand lvdisplay -am
+
+	section nr_requests getfilesfromcommand find /sys -name nr_requests
+	section read_ahead_kb getfilesfromcommand find /sys -name read_ahead_kb
+	section scheduler getfilesfromcommand find /sys -name scheduler
+	section rotational getfilesfromcommand find /sys -name rotational
+
+	# Network info
+	section ifconfig runcommand ifconfig -a
+	section route runcommand route -n
+	section iptables runcommand iptables -L -v -n
+	section iptables_nat runcommand iptables -t nat -L -v -n
+	section ip_link runcommand ip link
+	section ip_addr runcommand ip addr
+	section ip_route runcommand ip route
+	section ip_rule runcommand ip rule
+	section ip_neigh runcommand ip neigh
+	section hosts getfiles /etc/hosts
+	section host.conf getfiles /etc/host.conf
+	section resolv getfiles /etc/resolv.conf
+	section nsswitch getfiles /etc/nsswitch.conf
+	section networks getfiles /etc/networks
+	section rpcinfo runcommand rpcinfo -p
+	section netstat runcommand netstat -anpoe
+
+	# Network time info
+	section ntp getfiles /etc/ntp.conf
+	section ntp subsection chkconfig runcommand chkconfig --list ntpd
+	section ntp subsection status runcommand ntpstat
+	section ntp subsection peers runcommand ntpq -p
+	section ntp subsection peers_n runcommand ntpq -pn
+	section chronyc subsection tracking runcommand chronyc tracking
+	section chronyc subsection sources runcommand chronyc sources
+	section chronyc subsection sourcestats runcommand chronyc sourcestats
+
+	# Hardware info
+	section dmesg runcommand dmesg
+	section lspci runcommand lspci -vvv
+	section dmidecode runcommand dmidecode --type memory
+	section sensors runcommand sensors
+	section mcelog getfiles /var/log/mcelog
+
+	# Numa settings
+	section numactl subsection command runcommand which numactl
+	section numactl subsection hardware runcommand numactl --hardware
+	section numactl subsection show runcommand numactl --show
+
+	# Process/kernel info
+	section procinfo getfiles /proc/mounts /proc/self/mountinfo /proc/cpuinfo /proc/meminfo /proc/zoneinfo /proc/swaps /proc/modules /proc/vmstat /proc/loadavg /proc/uptime /proc/cgroups /proc/partitions
+	section transparent_hugepage getfilesfromcommand find /sys/kernel/mm/{redhat_,}transparent_hugepage -type f
+	section ps runcommand ps -eLFww
+
+	# Dynamic/monitoring info
+	section top
 	runcommands
-		smartctl --scan | sed -e "s/#.*$//" | while read i; do smartctl --all $i; done
+	COLUMNS=512 top -b -d 1 -n 30 -c | sed -e 's/ *$//g'
 	endruncommands
-endsection
-section scsidevices getfiles /sys/bus/scsi/devices/*/model
+	endsection
+	section top_threads
+	runcommands
+	COLUMNS=512 top -b -d 1 -n 30 -c -H | sed -e 's/ *$//g'
+	endruncommands
+	endsection
+	section iostat runcommand iostat -xtm 1 120
+
+	# Mongo process info
+	declare -g mongo_pids="`pgrep mongo`"
+	section mongo_summary runcommand ps -Fww -p $mongo_pids
+	for pid in $mongo_pids; do
+		section proc/$pid
+			runcommand lsfiles /proc/$pid/cmdline
+			subsection cmdline runcommand printeach0file /proc/$pid/cmdline
+			printeach0file /proc/$pid/cmdline | awk '$0 == "-f" || $0 == "--config" { getline; print; }' | getstdinfiles
+			getfiles /proc/$pid/limits /proc/$pid/mounts /proc/$pid/mountinfo /proc/$pid/smaps /proc/$pid/numa_maps
+			subsection /proc/$pid/fd runcommand lsfiles /proc/$pid/fd
+			subsection /proc/$pid/fdinfo runcommand lsfiles /proc/$pid/fdinfo
+			getfiles /proc/$pid/cgroup
+		endsection
+	done
+	section global_mongodb_conf getfiles /etc/mongodb.conf /etc/mongod.conf
+	section global_mms_conf getfiles /etc/mongodb-mms/*
+
+	# Hardware info with a risk of hanging
+	section smartctl
+		runcommands
+			smartctl --scan | sed -e "s/#.*$//" | while read i; do smartctl --all $i; done
+		endruncommands
+	endsection
+	section scsidevices getfiles /sys/bus/scsi/devices/*/model
 
 
-##################################################################################
+	##################################################################################
 
 
-_output_postamble
-_finish
+	_output_postamble
+	_finish
 
-cat <<EOF
+	cat <<EOF
 
 ==============================================================
 MongoDB diagnostic information has been recorded in the file:
@@ -1072,4 +1074,8 @@ Please upload that file to the ticket${ticket_url:+ at:
 ==============================================================
 
 EOF
+
+}
+
+_main
 
