@@ -92,61 +92,69 @@ validoutputformat[txt]=txt
 validoutputformat[text]=txt
 validoutputformat[json]=json
 
-outputformat=json
-inhibit_new_version_check=n
-inhibit_version_update=n
+function set_defaults {
+	declare -g outputformat=json
+	declare -g inhibit_new_version_check=n
+	declare -g inhibit_version_update=n
+}
 
-while [ "${1%%-*}" = "" -a "x$1" != "x" ]; do
-	case "$1" in
-		--txt|--text|--json)
-			outputformat="${1#--}"
-			;;
-		--format)
-			shift
-			outputformat="$1"
-			;;
-		--answer)
-			shift
-			case "$1" in
-				[yYnNqQ])
-					auto_answer="$1"
-					;;
-				[dD])
-					auto_answer=""  # simulates pressing Enter
-					;;
-				*)
-					user_error_fatal "unknown value for --answer: \"$1\""
-					;;
-			esac
-			;;
-		--inhibit-new-version-check)
-			inhibit_new_version_check=y
-			;;
-		--inhibit-version-update)
-			inhibit_version_update=y
-			;;
-		--internal-updated-from)
-			shift
-			updated_from="$1"
-			;;
-		--internal-relaunched-from)
-			shift
-			relaunched_from="$1"
-			;;
-		--help|-h)
-			showhelp
-			exit 0
-			;;
-		--version|-v)
-			showversion
-			exit 0
-			;;
-		*)
-			user_error_fatal "unknown parameter \"$1\""
-			;;
-	esac
-	shift
-done
+set_defaults
+
+function parse_cmdline {
+	while [ "${1%%-*}" = "" -a "x$1" != "x" ]; do
+		case "$1" in
+			--txt|--text|--json)
+				outputformat="${1#--}"
+				;;
+			--format)
+				shift
+				outputformat="$1"
+				;;
+			--answer)
+				shift
+				case "$1" in
+					[yYnNqQ])
+						declare -g auto_answer="$1"
+						;;
+					[dD])
+						declare -g auto_answer=""  # simulates pressing Enter
+						;;
+					*)
+						user_error_fatal "unknown value for --answer: \"$1\""
+						;;
+				esac
+				;;
+			--inhibit-new-version-check)
+				inhibit_new_version_check=y
+				;;
+			--inhibit-version-update)
+				inhibit_version_update=y
+				;;
+			--internal-updated-from)
+				shift
+				declare -g updated_from="$1"
+				;;
+			--internal-relaunched-from)
+				shift
+				declare -g relaunched_from="$1"
+				;;
+			--help|-h)
+				showhelp
+				exit 0
+				;;
+			--version|-v)
+				showversion
+				exit 0
+				;;
+			*)
+				user_error_fatal "unknown parameter \"$1\""
+				;;
+		esac
+		shift
+	done
+}
+
+parse_cmdline "$@"
 
 ref="$1"
 host="$(hostname)"
