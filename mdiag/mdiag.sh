@@ -343,11 +343,15 @@ function check_valid_output_format {
 
 check_valid_output_format
 
-numoutputs=0
+function init_output_vars {
+	declare -g numoutputs=0
 
-# FIXME: use mktemp if possible
-mainoutput="$outputbase-$$.$outputformat"
-finaloutput="$outputbase.$outputformat"
+	# FIXME: use mktemp if possible
+	declare -g mainoutput="$outputbase-$$.$outputformat"
+	declare -g finaloutput="$outputbase.$outputformat"
+}
+
+init_output_vars
 
 exec 3>&1
 
