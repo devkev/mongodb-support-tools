@@ -250,7 +250,6 @@ function get_with_curl {
 	get_with curl --silent --retry 0 --connect-timeout 10 --max-time 120 --output "$download_target" "$download_url"
 }
 
-# Check for new version
 function check_for_new_version {
 	if [ "$inhibit_new_version_check" != y -a "$updated_from" = "" -a "$relaunched_from" = "" ]; then
 		declare -g download_url='https://raw.githubusercontent.com/mongodb/support-tools/master/mdiag/mdiag.sh'
