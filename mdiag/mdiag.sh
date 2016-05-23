@@ -477,6 +477,7 @@ function _reset_vars {
 	unset ts_started ts_ended ts command rc types fields values outputnum output_fieldname
 	declare -a types fields values
 }
+
 _reset_vars
 
 function _emit_txt {
