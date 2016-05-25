@@ -87,15 +87,15 @@ function user_error_fatal {
 	exit 1
 }
 
-function set_defaults {
+function _set_defaults {
 	declare -g outputformat=json
 	declare -g inhibit_new_version_check=n
 	declare -g inhibit_version_update=n
 }
 
-set_defaults
+_set_defaults
 
-function parse_cmdline {
+function _parse_cmdline {
 	while [ "${1%%-*}" = "" -a "x$1" != "x" ]; do
 		case "$1" in
 			--txt|--text|--json)
@@ -149,7 +149,7 @@ function parse_cmdline {
 	done
 }
 
-parse_cmdline "$@"
+_parse_cmdline "$@"
 
 ref="$1"
 host="$(hostname)"
@@ -165,7 +165,7 @@ esac
 # FIXME: put everything into a subdir (using mktemp)
 outputbase="${TMPDIR:-/tmp}/mdiag-$host"
 
-function print_header {
+function _print_header {
 	echo "========================="
 	echo "MongoDB Diagnostic Report"
 	echo "mdiag.sh version $version"
@@ -173,9 +173,9 @@ function print_header {
 	echo
 }
 
-print_header
+_print_header
 
-function check_for_ref {
+function _check_for_ref {
 	if [ "$ref" = "" ]; then
 		echo "WARNING: No reference has been supplied.  If you have a ticket number or other"
 		echo "reference, you should re-run mdiag.sh and pass it on the command line."
@@ -184,7 +184,7 @@ function check_for_ref {
 	fi
 }
 
-check_for_ref
+_check_for_ref
 
 function read_ynq {
 	local msg="$1"
@@ -250,7 +250,7 @@ function get_with_curl {
 	get_with curl --silent --retry 0 --connect-timeout 10 --max-time 120 --output "$download_target" "$download_url"
 }
 
-function check_for_new_version {
+function _check_for_new_version {
 	if [ "$inhibit_new_version_check" != y -a "$updated_from" = "" -a "$relaunched_from" = "" ]; then
 		declare -g download_url='https://raw.githubusercontent.com/mongodb/support-tools/master/mdiag/mdiag.sh'
 		# FIXME: put this (and everything) into an $outputbase-based subdir
@@ -325,7 +325,7 @@ function check_for_new_version {
 	fi
 }
 
-check_for_new_version
+_check_for_new_version
 
 
 declare -A validoutputformat
@@ -333,7 +333,7 @@ validoutputformat[txt]=txt
 validoutputformat[text]=txt
 validoutputformat[json]=json
 
-function check_valid_output_format {
+function _check_valid_output_format {
 	if [ "${validoutputformat["$outputformat"]:+set}" = "set" ]; then
 		declare -g outputformat="${validoutputformat["$outputformat"]}"
 	else
@@ -341,9 +341,9 @@ function check_valid_output_format {
 	fi
 }
 
-check_valid_output_format
+_check_valid_output_format
 
-function init_output_vars {
+function _init_output_vars {
 	declare -g numoutputs=0
 
 	# FIXME: use mktemp if possible
@@ -351,7 +351,7 @@ function init_output_vars {
 	declare -g finaloutput="$outputbase.$outputformat"
 }
 
-init_output_vars
+_init_output_vars
 
 exec 3>&1
 
@@ -375,11 +375,11 @@ function _now {
 	date -Ins | sed -e 's/,\([0-9]\{3\}\)[0-9]\{6\}/.\1/'
 }
 
-function create_tag {
+function _create_tag {
 	declare -g tag="$(_now)"
 }
 
-create_tag
+_create_tag
 
 function _graboutput {
 	exec >> "$outfile" 2>> "$errfile"
