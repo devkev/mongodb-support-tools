@@ -91,6 +91,15 @@ function _set_defaults {
 	declare -g outputformat=json
 	declare -g inhibit_new_version_check=n
 	declare -g inhibit_version_update=n
+	declare -g ref
+	declare -g ticket_url
+
+	declare -g host="$(hostname)"
+	# Deferred to after the definition of _now
+	#declare -g tag="$(_now)"
+
+	# FIXME: put everything into a subdir (using mktemp)
+	declare -g outputbase="${TMPDIR:-/tmp}/mdiag-$host"
 }
 
 _set_defaults
@@ -147,23 +156,17 @@ function _parse_cmdline {
 		esac
 		shift
 	done
+
+	ref="$1"
+
+	case "$ref" in
+		CS-*|SUPPORT-*|MMSSUPPORT-*)
+			ticket_url="https://jira.mongodb.org/browse/$ref"
+			;;
+	esac
 }
 
 _parse_cmdline "$@"
-
-ref="$1"
-host="$(hostname)"
-# Deferred to after the definition of _now
-#tag="$(_now)"
-
-case "$ref" in
-	CS-*|SUPPORT-*|MMSSUPPORT-*)
-		ticket_url="https://jira.mongodb.org/browse/$ref"
-		;;
-esac
-
-# FIXME: put everything into a subdir (using mktemp)
-outputbase="${TMPDIR:-/tmp}/mdiag-$host"
 
 function _print_header {
 	echo "========================="
