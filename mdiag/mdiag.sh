@@ -321,11 +321,19 @@ function _check_for_new_version {
 }
 
 function _check_valid_output_format {
-	if [ "${validoutputformat["$outputformat"]:+set}" = "set" ]; then
-		declare -g outputformat="${validoutputformat["$outputformat"]}"
-	else
-		user_error_fatal "unsupported output format \"$outputformat\""
-	fi
+	case "$outputformat" in
+		txt|json)
+			# valid
+			;;
+		text)
+			# valid alias
+			outputformat="txt"
+			;;
+		*)
+			# invalid
+			user_error_fatal "unsupported output format \"$outputformat\""
+			;;
+	esac
 }
 
 function _init_output_vars {
@@ -1053,12 +1061,6 @@ _parse_cmdline "$@"
 _print_header
 _check_for_ref
 _check_for_new_version
-
-declare -A validoutputformat
-validoutputformat[txt]=txt
-validoutputformat[text]=txt
-validoutputformat[json]=json
-
 _check_valid_output_format
 _init_output_vars
 
