@@ -56,6 +56,8 @@ if test "$_os" != "GNU/Linux"; then
 	exit 1
 fi
 
+_lf="$(echo -ne '\r')"
+
 function showversion {
 	echo "mdiag.sh: MongoDB System Diagnostic Information Gathering Tool"
 	echo "version $version, copyright (c) 2014-2016, MongoDB, Inc."
@@ -583,21 +585,28 @@ function _emit {
 	_reset_vars
 }
 
-function _output_preamble {
+function _setup_fds {
+	exec 3>&1
+
 	# Grab any stray stderr
 	_nextoutput
-	stray_stderr_outfile="$errfile"
+	declare -g stray_stderr_outfile="$errfile"
 	exec 4>> "$stray_stderr_outfile"
 	exec 2>&4
+}
 
+function _teardown_fds {
+	exec 2>&1   # stderr back to console
+	exec 4>&-   # close the file so it gets flushed
+}
+
+function _output_preamble {
 	_output_preamble_"$outputformat" "$mainoutput"
 }
 
 function _output_postamble {
 	section stray_stderr
 	errfile="$stray_stderr_outfile"
-	exec 2>&1   # stderr back to console
-	exec 4>&-   # close the file so it gets flushed
 	_emit
 	endsection
 
@@ -870,6 +879,7 @@ function _main {
 	echo
 
 
+	_setup_fds
 	_output_preamble
 
 	shopt -s nullglob
@@ -1038,6 +1048,7 @@ function _main {
 	##################################################################################
 
 
+	_teardown_fds
 	_output_postamble
 	_finish
 
@@ -1063,11 +1074,6 @@ _check_for_ref
 _check_for_new_version
 _check_valid_output_format
 _init_output_vars
-
-exec 3>&1
-
-_lf="$(echo -ne '\r')"
-
 _reset_vars
 
 _main
