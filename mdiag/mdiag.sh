@@ -102,8 +102,6 @@ function _set_defaults {
 	declare -g outputbase="${TMPDIR:-/tmp}/mdiag-$host"
 }
 
-_set_defaults
-
 function _parse_cmdline {
 	while [ "${1%%-*}" = "" -a "x$1" != "x" ]; do
 		case "$1" in
@@ -166,7 +164,6 @@ function _parse_cmdline {
 	esac
 }
 
-_parse_cmdline "$@"
 
 function _print_header {
 	echo "========================="
@@ -176,8 +173,6 @@ function _print_header {
 	echo
 }
 
-_print_header
-
 function _check_for_ref {
 	if [ "$ref" = "" ]; then
 		echo "WARNING: No reference has been supplied.  If you have a ticket number or other"
@@ -186,8 +181,6 @@ function _check_for_ref {
 		echo
 	fi
 }
-
-_check_for_ref
 
 function read_ynq {
 	local msg="$1"
@@ -328,14 +321,6 @@ function _check_for_new_version {
 	fi
 }
 
-_check_for_new_version
-
-
-declare -A validoutputformat
-validoutputformat[txt]=txt
-validoutputformat[text]=txt
-validoutputformat[json]=json
-
 function _check_valid_output_format {
 	if [ "${validoutputformat["$outputformat"]:+set}" = "set" ]; then
 		declare -g outputformat="${validoutputformat["$outputformat"]}"
@@ -344,8 +329,6 @@ function _check_valid_output_format {
 	fi
 }
 
-_check_valid_output_format
-
 function _init_output_vars {
 	declare -g numoutputs=0
 
@@ -353,10 +336,6 @@ function _init_output_vars {
 	declare -g mainoutput="$outputbase-$$.$outputformat"
 	declare -g finaloutput="$outputbase.$outputformat"
 }
-
-_init_output_vars
-
-exec 3>&1
 
 
 ###############################################################
@@ -382,8 +361,6 @@ function _create_tag {
 	declare -g tag="$(_now)"
 }
 
-_create_tag
-
 function _graboutput {
 	exec >> "$outfile" 2>> "$errfile"
 }
@@ -391,8 +368,6 @@ function _graboutput {
 function _ungraboutput {
 	exec 1>&3 2>&4
 }
-
-_lf="$(echo -ne '\r')"
 
 function _json_strings_arrayify {
 	local a=("$@")
@@ -480,8 +455,6 @@ function _reset_vars {
 	unset ts_started ts_ended ts command rc types fields values outputnum output_fieldname
 	declare -a types fields values
 }
-
-_reset_vars
 
 function _emit_txt {
 	echo ""
@@ -1079,6 +1052,28 @@ Please upload that file to the ticket${ticket_url:+ at:
 EOF
 
 }
+
+_set_defaults
+_parse_cmdline "$@"
+_print_header
+_check_for_ref
+_check_for_new_version
+
+declare -A validoutputformat
+validoutputformat[txt]=txt
+validoutputformat[text]=txt
+validoutputformat[json]=json
+
+_check_valid_output_format
+_init_output_vars
+
+exec 3>&1
+
+_create_tag
+
+_lf="$(echo -ne '\r')"
+
+_reset_vars
 
 _main
 
