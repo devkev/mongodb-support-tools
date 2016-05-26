@@ -864,6 +864,15 @@ function lsfiles {
 
 function _main {
 
+	_set_defaults
+	_parse_cmdline "$@"
+	_print_header
+	_check_for_ref
+	_check_for_new_version
+	_check_valid_output_format
+	_init_output_vars
+	_reset_vars
+
 	if [ "$ref" ]; then
 		echo "Reference: $ref"
 		if [ "$ticket_url" ]; then
@@ -1066,15 +1075,6 @@ Please upload that file to the ticket${ticket_url:+ at:
 EOF
 
 }
-
-_set_defaults
-_parse_cmdline "$@"
-_print_header
-_check_for_ref
-_check_for_new_version
-_check_valid_output_format
-_init_output_vars
-_reset_vars
 
 _main
 
