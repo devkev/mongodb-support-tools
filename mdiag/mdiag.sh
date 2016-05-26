@@ -1076,5 +1076,7 @@ EOF
 
 }
 
-_main
+if [ "${__MDIAG_UNIT_TEST:-unset}" = "unset" ]; then
+	_main
+fi
 
