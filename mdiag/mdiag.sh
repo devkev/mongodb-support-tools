@@ -95,8 +95,7 @@ function _set_defaults {
 	declare -g ticket_url
 
 	declare -g host="$(hostname)"
-	# Deferred to after the definition of _now
-	#declare -g tag="$(_now)"
+	declare -g tag="$(_now)"
 
 	# FIXME: put everything into a subdir (using mktemp)
 	declare -g outputbase="${TMPDIR:-/tmp}/mdiag-$host"
@@ -355,10 +354,6 @@ function _nextoutput {
 
 function _now {
 	date -Ins | sed -e 's/,\([0-9]\{3\}\)[0-9]\{6\}/.\1/'
-}
-
-function _create_tag {
-	declare -g tag="$(_now)"
 }
 
 function _graboutput {
@@ -1068,8 +1063,6 @@ _check_valid_output_format
 _init_output_vars
 
 exec 3>&1
-
-_create_tag
 
 _lf="$(echo -ne '\r')"
 
