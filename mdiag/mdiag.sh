@@ -57,8 +57,434 @@ if test "$_os" != "GNU/Linux"; then
 fi
 
 
+##################################################################################
+
+
+function _main {
+
+	_set_defaults
+	_parse_cmdline "$@"
+	_print_header
+	_check_for_ref
+	_check_for_new_version
+	_check_valid_output_format
+	_init_output_vars
+	_reset_vars
+	_print_user_run_advice
+	_setup_fds
+	_output_preamble
+
+	shopt -s nullglob
+
+
+	####################
+
+
+	# Generic/system/distro/boot info
+	section fingerprint fingerprint
+	section args runcommand printeach "$@"
+	section date runcommand date
+	section hostname runcommand hostname
+	section hostname_fqdn runcommand hostname -f
+	section whoami runcommand whoami
+	section mdiag_upgrade getenvvars inhibit_new_version_check inhibit_version_update updated_from relaunched_from newversion user_elected_no_update update_not_possible user_elected_not_to_run_newversion download_url download_target
+	section environment getenvvars PATH LD_LIBRARY_PATH LD_PRELOAD PYTHONPATH PYTHONHOME
+	section distro getfiles /etc/*release /etc/*version
+	section uname runcommand uname -a
+	section glibc runcommand lsfiles /lib*/libc.so* /lib/*/libc.so*
+	section glibc2 runcommand eval "/lib*/libc.so* || /lib/*/libc.so*"
+	section ld.so.conf getfiles /etc/ld.so.conf /etc/ld.so.conf.d/*
+	section lsb runcommand lsb_release -a
+	section rc.local getfiles /etc/rc.local
+	section sysctl runcommand sysctl -a
+	section sysctl.conf getfiles /etc/sysctl.conf /etc/sysctl.d/*
+	section ulimit runcommand ulimit -a
+	section limits.conf getfiles /etc/security/limits.conf /etc/security/limits.d/*
+	section selinux runcommand sestatus
+	section uptime runcommand uptime
+	section boot runcommand who -b
+	section runlevel runcommand who -r
+	section clock_change runcommand who -t
+	section timezone_config getfiles /etc/timezone /etc/sysconfig/clock
+	section timedatectl runcommand timedatectl
+	section localtime runcommand lsfiles /etc/localtime
+	section localtime_matches runcommand find /usr/share/zoneinfo -type f -exec cmp -s \{\} /etc/localtime \; -print
+	section clocksource getfiles /sys/devices/system/clocksource/clocksource*/{current,available}_clocksource
+
+	section chkconfig_list runcommand chkconfig --list
+	section initctl_list runcommand initctl list
+
+	# Block device/filesystem info
+	section scsi getfiles /proc/scsi/scsi
+	section blockdev runcommand blockdev --report
+	section lsblk runcommand lsblk
+
+	section udev_disks
+		runcommands
+			awk '{ $0 = $4 } /^[sh]d[a-z]+$/' /proc/partitions | xargs -n1 --no-run-if-empty udevadm info --query all --name
+		endruncommands
+	endsection
+
+	section fstab getfiles /etc/fstab
+	section mount runcommand mount
+	section df-h runcommand df -h
+	section df-k runcommand df -k
+
+	section mdstat getfiles /proc/mdstat
+	section mdadm_detail_scan runcommand mdadm --detail --scan
+	section mdadm_detail
+		runcommands
+			sed -ne 's,^\(md[0-9]\+\) : .*$,/dev/\1,p' < /proc/mdstat | xargs -n1 --no-run-if-empty mdstat --detail
+		endruncommands
+	endsection
+
+	section dmsetup runcommand dmsetup ls
+	section device_mapper runcommand lsfiles -R /dev/mapper /dev/dm-*
+
+	section lvm subsection pvs runcommand pvs -v
+	section lvm subsection vgs runcommand vgs -v
+	section lvm subsection lvs runcommand lvs -v
+	section lvm subsection pvdisplay runcommand pvdisplay -m
+	section lvm subsection vgdisplay runcommand vgdisplay -v
+	section lvm subsection lvdisplay runcommand lvdisplay -am
+
+	section nr_requests getfilesfromcommand find /sys -name nr_requests
+	section read_ahead_kb getfilesfromcommand find /sys -name read_ahead_kb
+	section scheduler getfilesfromcommand find /sys -name scheduler
+	section rotational getfilesfromcommand find /sys -name rotational
+
+	# Network info
+	section ifconfig runcommand ifconfig -a
+	section route runcommand route -n
+	section iptables runcommand iptables -L -v -n
+	section iptables_nat runcommand iptables -t nat -L -v -n
+	section ip_link runcommand ip link
+	section ip_addr runcommand ip addr
+	section ip_route runcommand ip route
+	section ip_rule runcommand ip rule
+	section ip_neigh runcommand ip neigh
+	section hosts getfiles /etc/hosts
+	section host.conf getfiles /etc/host.conf
+	section resolv getfiles /etc/resolv.conf
+	section nsswitch getfiles /etc/nsswitch.conf
+	section networks getfiles /etc/networks
+	section rpcinfo runcommand rpcinfo -p
+	section netstat runcommand netstat -anpoe
+
+	# Network time info
+	section ntp getfiles /etc/ntp.conf
+	section ntp subsection chkconfig runcommand chkconfig --list ntpd
+	section ntp subsection status runcommand ntpstat
+	section ntp subsection peers runcommand ntpq -p
+	section ntp subsection peers_n runcommand ntpq -pn
+	section chronyc subsection tracking runcommand chronyc tracking
+	section chronyc subsection sources runcommand chronyc sources
+	section chronyc subsection sourcestats runcommand chronyc sourcestats
+
+	# Hardware info
+	section dmesg runcommand dmesg
+	section lspci runcommand lspci -vvv
+	section dmidecode runcommand dmidecode --type memory
+	section sensors runcommand sensors
+	section mcelog getfiles /var/log/mcelog
+
+	# Numa settings
+	section numactl subsection command runcommand which numactl
+	section numactl subsection hardware runcommand numactl --hardware
+	section numactl subsection show runcommand numactl --show
+
+	# Process/kernel info
+	section procinfo getfiles /proc/mounts /proc/self/mountinfo /proc/cpuinfo /proc/meminfo /proc/zoneinfo /proc/swaps /proc/modules /proc/vmstat /proc/loadavg /proc/uptime /proc/cgroups /proc/partitions
+	section transparent_hugepage getfilesfromcommand find /sys/kernel/mm/{redhat_,}transparent_hugepage -type f
+	section ps runcommand ps -eLFww
+
+	# Dynamic/monitoring info
+	section top
+	runcommands
+	COLUMNS=512 top -b -d 1 -n 30 -c | sed -e 's/ *$//g'
+	endruncommands
+	endsection
+	section top_threads
+	runcommands
+	COLUMNS=512 top -b -d 1 -n 30 -c -H | sed -e 's/ *$//g'
+	endruncommands
+	endsection
+	section iostat runcommand iostat -xtm 1 120
+
+	# Mongo process info
+	mongo_pids="`pgrep mongo`"
+	section mongo_summary runcommand ps -Fww -p $mongo_pids
+	for pid in $mongo_pids; do
+		section proc/$pid
+			runcommand lsfiles /proc/$pid/cmdline
+			subsection cmdline runcommand printeach0file /proc/$pid/cmdline
+			printeach0file /proc/$pid/cmdline | awk '$0 == "-f" || $0 == "--config" { getline; print; }' | getstdinfiles
+			getfiles /proc/$pid/limits /proc/$pid/mounts /proc/$pid/mountinfo /proc/$pid/smaps /proc/$pid/numa_maps
+			subsection /proc/$pid/fd runcommand lsfiles /proc/$pid/fd
+			subsection /proc/$pid/fdinfo runcommand lsfiles /proc/$pid/fdinfo
+			getfiles /proc/$pid/cgroup
+		endsection
+	done
+	section global_mongodb_conf getfiles /etc/mongodb.conf /etc/mongod.conf
+	section global_mms_conf getfiles /etc/mongodb-mms/*
+
+	# Hardware info with a risk of hanging
+	section smartctl
+		runcommands
+			smartctl --scan | sed -e "s/#.*$//" | while read i; do smartctl --all $i; done
+		endruncommands
+	endsection
+	section scsidevices getfiles /sys/bus/scsi/devices/*/model
+
+
+	####################
+
+
+	_teardown_fds
+	_output_postamble
+	_finish
+
+	_print_end
+}
+
+
+
 ###############################################################
-# Internal internal functions (not used by the actual tests)
+# Internal API functions (used by the actual tests)
+###############################################################
+
+function section {
+	if [ "${section:+set}" = set ]; then
+		endsection
+	fi
+    section="$1"
+    shift
+    echo -n "Gathering $section info... " 1>&3
+    if [ $# -gt 0 ]; then
+        "$@"
+        endsection
+    fi
+}
+
+function endsection {
+    echo "done" 1>&3
+    unset section
+}
+
+function subsection {
+    subsection="$1"
+    shift
+    if [ $# -gt 0 ]; then
+        "$@"
+        endsubsection
+    fi
+}
+
+function endsubsection {
+    unset subsection
+}
+
+function runcommands {
+	_nextoutput
+	_graboutput
+	ts_started="$(_now)"
+	if [ "$1" != "_notrace" ]; then
+		set -x
+	fi
+}
+
+function endruncommands {
+	# Undo redirections
+	rc=$?
+	set +x
+	_ungraboutput
+	ts_ended="$(_now)"
+	# FIXME: this should be able to be done quicker with sed
+	grep -Ev '^\+ (_?end ?runcommands( runcommands)?|rc=-?[0-9]+|set \+x)$' "$errfile" > "$errfile.new" ; mv -f "$errfile.new" "$errfile"
+	#_addfield file_lines_array output "$outfile"
+	#_addfield file_lines_array error "$errfile"
+	_emit
+}
+
+function runcommand {
+	command=("$@")
+	runcommands _notrace
+	"$@"
+	endruncommands
+}
+
+function printeach {
+	local i
+	for i; do
+		echo "$i"
+	done
+}
+
+function printeach0 {
+	xargs -n1 -0
+}
+
+function printeach0file {
+	local i
+	for i; do
+		printeach0 < "$i"
+	done
+}
+
+function fingerprint {
+	ts="$(_now)"
+	_addfield string "script" "mdiag.sh"
+	_addfield string "revdate" "$revdate"
+	_addfield string "os" "$_os"
+	_addfield string "shell" "$SHELL"
+	_addfield string "scriptversion" "$version"
+	_emit
+}
+
+function getenvvars {
+	local i
+	for i; do
+		ts="$(_now)"
+		_addfield string "envvar" "$i"
+		if [ "${!i+set}" = set ]; then
+			_addfield boolean set true
+			_addfield string "value" "${!i}"
+
+			_nextoutput
+			_graboutput
+			declare -p "$i"
+			_ungraboutput
+			output_fieldname="declaration"
+			#_addfield file_lines_array declaration "$outfile"
+			#_addfield file_lines_array error "$errfile"
+		else
+			_addfield boolean set false
+		fi
+		subsection '$'"$i" _emit
+	done
+}
+
+function getfiles {
+	local f
+	for f; do
+		ts="$(_now)"
+		_addfield string "filename" "$f"
+		if [ -e "$f" ]; then
+			_addfield boolean exists true
+			_addfield string ls "$(ls -l "$f" 2>&1)"
+
+			# FIXME: this doesn't need an associative array; remove it
+			declare -lA _stat
+			local format
+			format+="_stat[mode_oct]='%a' "
+			format+="_stat[mode_sym]='%A' "
+			format+="_stat[num_blocks]='%b' "
+			format+="_stat[block_size]='%B' "
+			format+="_stat[context]='%C' "
+			format+="_stat[device]='%d' "
+			format+="_stat[type]='%F' "
+			format+="_stat[gid]='%g' "
+			format+="_stat[group]='%G' "
+			format+="_stat[links]='%h' "
+			format+="_stat[inode]='%i' "
+			format+="_stat[mountpoint]='%m' "
+			format+="_stat[iohint]='%o' "
+			format+="_stat[size]='%s' "
+			format+="_stat[major]='%t' "
+			format+="_stat[minor]='%T' "
+			format+="_stat[uid]='%u' "
+			format+="_stat[user]='%U' "
+			format+="_stat[time_birth]='%w' "
+			format+="_stat[time_birth_epoch]='%W' "
+			format+="_stat[time_access]='%x' "
+			format+="_stat[time_access_epoch]='%X' "
+			format+="_stat[time_mod]='%y' "
+			format+="_stat[time_mod_epoch]='%Y' "
+			format+="_stat[time_change]='%z' "
+			format+="_stat[time_change_epoch]='%Z' "
+			eval "$(stat --printf "$format" "$f" 2>/dev/null)"
+
+			local i
+			i="mode_oct"          ; _addfield string "$i" "${_stat[$i]}"
+			i="mode_sym"          ; _addfield string "$i" "${_stat[$i]}"
+			i="num_blocks"        ; _addfield number "$i" "${_stat[$i]}"
+			i="block_size"        ; _addfield number "$i" "${_stat[$i]}"
+			i="context"           ; _addfield string "$i" "${_stat[$i]}"
+			i="device"            ; _addfield number "$i" "${_stat[$i]}"
+			i="type"              ; _addfield string "$i" "${_stat[$i]}"
+			i="gid"               ; _addfield number "$i" "${_stat[$i]}"
+			i="group"             ; _addfield string "$i" "${_stat[$i]}"
+			i="links"             ; _addfield number "$i" "${_stat[$i]}"
+			i="inode"             ; _addfield number "$i" "${_stat[$i]}"
+			i="mountpoint"        ; _addfield string "$i" "${_stat[$i]}"
+			i="iohint"            ; _addfield number "$i" "${_stat[$i]}"
+			i="size"              ; _addfield number "$i" "${_stat[$i]}"
+			i="major"             ; _addfield number "$i" "${_stat[$i]}"
+			i="minor"             ; _addfield number "$i" "${_stat[$i]}"
+			i="uid"               ; _addfield number "$i" "${_stat[$i]}"
+			i="user"              ; _addfield string "$i" "${_stat[$i]}"
+			i="time_birth"        ; _addfield string "$i" "${_stat[$i]}"
+			i="time_birth_epoch"  ; _addfield number "$i" "${_stat[$i]}"
+			i="time_access"       ; _addfield string "$i" "${_stat[$i]}"
+			i="time_access_epoch" ; _addfield number "$i" "${_stat[$i]}"
+			i="time_mod"          ; _addfield string "$i" "${_stat[$i]}"
+			i="time_mod_epoch"    ; _addfield number "$i" "${_stat[$i]}"
+			i="time_change"       ; _addfield string "$i" "${_stat[$i]}"
+			i="time_change_epoch" ; _addfield number "$i" "${_stat[$i]}"
+
+			_nextoutput
+			_graboutput
+			cat "$f"
+			_ungraboutput
+			output_fieldname="content"
+			#_addfield file_lines_array content "$outfile"
+			#_addfield file_lines_array error "$errfile"
+		else
+			_addfield boolean exists false
+		fi
+		subsection "$f" _emit
+	done
+}
+
+function getstdinfiles {
+	local i
+	while read i; do
+		getfiles "$i"
+	done
+}
+
+function getfilesfromcommand {
+	"$@" | getstdinfiles
+}
+
+
+function lsfiles {
+	somefiles=
+	restfiles=
+	for f; do
+		if [ "x$restfiles" = "x" ]; then
+			case "$f" in
+				--) restfiles=y ;;
+				-*) ;;
+				*)
+					somefiles=y
+					break
+					;;
+			esac
+		else
+			somefiles=y
+			break
+		fi
+	done
+	if [ "x$somefiles" != "x" ]; then
+		ls -la "$@"
+	fi
+}
+
+
+
+###############################################################
+# Internal internal functions (not directly used by the tests)
 ###############################################################
 
 _lf="$(echo -ne '\r')"
@@ -186,6 +612,37 @@ function _check_for_ref {
 		echo "Run \"bash mdiag.sh --help\" for help."
 		echo
 	fi
+}
+
+function _print_user_run_advice {
+	if [ "$ref" ]; then
+		echo "Reference: $ref"
+		if [ "$ticket_url" ]; then
+			echo "Ticket URL: $ticket_url"
+		fi
+		echo
+	fi
+	echo "Please wait while diagnostic information is gathered"
+	echo "into the $finaloutput file..."
+	echo
+	echo "If the display remains stuck for more than 5 minutes,"
+	echo "please press Control-C."
+	echo
+}
+
+function _print_end {
+	cat <<EOF
+
+==============================================================
+MongoDB diagnostic information has been recorded in the file:
+
+    $finaloutput
+
+Please upload that file to the ticket${ticket_url:+ at:
+    $ticket_url}
+==============================================================
+
+EOF
 }
 
 function _read_ynq {
@@ -628,456 +1085,6 @@ function _finish {
 }
 
 
-
-###############################################################
-# Internal API functions (used by the actual tests)
-###############################################################
-
-function section {
-	if [ "${section:+set}" = set ]; then
-		endsection
-	fi
-    section="$1"
-    shift
-    echo -n "Gathering $section info... " 1>&3
-    if [ $# -gt 0 ]; then
-        "$@"
-        endsection
-    fi
-}
-
-function endsection {
-    echo "done" 1>&3
-    unset section
-}
-
-function subsection {
-    subsection="$1"
-    shift
-    if [ $# -gt 0 ]; then
-        "$@"
-        endsubsection
-    fi
-}
-
-function endsubsection {
-    unset subsection
-}
-
-function runcommands {
-	_nextoutput
-	_graboutput
-	ts_started="$(_now)"
-	if [ "$1" != "_notrace" ]; then
-		set -x
-	fi
-}
-
-function endruncommands {
-	# Undo redirections
-	rc=$?
-	set +x
-	_ungraboutput
-	ts_ended="$(_now)"
-	# FIXME: this should be able to be done quicker with sed
-	grep -Ev '^\+ (_?end ?runcommands( runcommands)?|rc=-?[0-9]+|set \+x)$' "$errfile" > "$errfile.new" ; mv -f "$errfile.new" "$errfile"
-	#_addfield file_lines_array output "$outfile"
-	#_addfield file_lines_array error "$errfile"
-	_emit
-}
-
-function runcommand {
-	command=("$@")
-	runcommands _notrace
-	"$@"
-	endruncommands
-}
-
-function printeach {
-	local i
-	for i; do
-		echo "$i"
-	done
-}
-
-function printeach0 {
-	xargs -n1 -0
-}
-
-function printeach0file {
-	local i
-	for i; do
-		printeach0 < "$i"
-	done
-}
-
-function fingerprint {
-	ts="$(_now)"
-	_addfield string "script" "mdiag.sh"
-	_addfield string "revdate" "$revdate"
-	_addfield string "os" "$_os"
-	_addfield string "shell" "$SHELL"
-	_addfield string "scriptversion" "$version"
-	_emit
-}
-
-function getenvvars {
-	local i
-	for i; do
-		ts="$(_now)"
-		_addfield string "envvar" "$i"
-		if [ "${!i+set}" = set ]; then
-			_addfield boolean set true
-			_addfield string "value" "${!i}"
-
-			_nextoutput
-			_graboutput
-			declare -p "$i"
-			_ungraboutput
-			output_fieldname="declaration"
-			#_addfield file_lines_array declaration "$outfile"
-			#_addfield file_lines_array error "$errfile"
-		else
-			_addfield boolean set false
-		fi
-		subsection '$'"$i" _emit
-	done
-}
-
-function getfiles {
-	local f
-	for f; do
-		ts="$(_now)"
-		_addfield string "filename" "$f"
-		if [ -e "$f" ]; then
-			_addfield boolean exists true
-			_addfield string ls "$(ls -l "$f" 2>&1)"
-
-			# FIXME: this doesn't need an associative array; remove it
-			declare -lA _stat
-			local format
-			format+="_stat[mode_oct]='%a' "
-			format+="_stat[mode_sym]='%A' "
-			format+="_stat[num_blocks]='%b' "
-			format+="_stat[block_size]='%B' "
-			format+="_stat[context]='%C' "
-			format+="_stat[device]='%d' "
-			format+="_stat[type]='%F' "
-			format+="_stat[gid]='%g' "
-			format+="_stat[group]='%G' "
-			format+="_stat[links]='%h' "
-			format+="_stat[inode]='%i' "
-			format+="_stat[mountpoint]='%m' "
-			format+="_stat[iohint]='%o' "
-			format+="_stat[size]='%s' "
-			format+="_stat[major]='%t' "
-			format+="_stat[minor]='%T' "
-			format+="_stat[uid]='%u' "
-			format+="_stat[user]='%U' "
-			format+="_stat[time_birth]='%w' "
-			format+="_stat[time_birth_epoch]='%W' "
-			format+="_stat[time_access]='%x' "
-			format+="_stat[time_access_epoch]='%X' "
-			format+="_stat[time_mod]='%y' "
-			format+="_stat[time_mod_epoch]='%Y' "
-			format+="_stat[time_change]='%z' "
-			format+="_stat[time_change_epoch]='%Z' "
-			eval "$(stat --printf "$format" "$f" 2>/dev/null)"
-
-			local i
-			i="mode_oct"          ; _addfield string "$i" "${_stat[$i]}"
-			i="mode_sym"          ; _addfield string "$i" "${_stat[$i]}"
-			i="num_blocks"        ; _addfield number "$i" "${_stat[$i]}"
-			i="block_size"        ; _addfield number "$i" "${_stat[$i]}"
-			i="context"           ; _addfield string "$i" "${_stat[$i]}"
-			i="device"            ; _addfield number "$i" "${_stat[$i]}"
-			i="type"              ; _addfield string "$i" "${_stat[$i]}"
-			i="gid"               ; _addfield number "$i" "${_stat[$i]}"
-			i="group"             ; _addfield string "$i" "${_stat[$i]}"
-			i="links"             ; _addfield number "$i" "${_stat[$i]}"
-			i="inode"             ; _addfield number "$i" "${_stat[$i]}"
-			i="mountpoint"        ; _addfield string "$i" "${_stat[$i]}"
-			i="iohint"            ; _addfield number "$i" "${_stat[$i]}"
-			i="size"              ; _addfield number "$i" "${_stat[$i]}"
-			i="major"             ; _addfield number "$i" "${_stat[$i]}"
-			i="minor"             ; _addfield number "$i" "${_stat[$i]}"
-			i="uid"               ; _addfield number "$i" "${_stat[$i]}"
-			i="user"              ; _addfield string "$i" "${_stat[$i]}"
-			i="time_birth"        ; _addfield string "$i" "${_stat[$i]}"
-			i="time_birth_epoch"  ; _addfield number "$i" "${_stat[$i]}"
-			i="time_access"       ; _addfield string "$i" "${_stat[$i]}"
-			i="time_access_epoch" ; _addfield number "$i" "${_stat[$i]}"
-			i="time_mod"          ; _addfield string "$i" "${_stat[$i]}"
-			i="time_mod_epoch"    ; _addfield number "$i" "${_stat[$i]}"
-			i="time_change"       ; _addfield string "$i" "${_stat[$i]}"
-			i="time_change_epoch" ; _addfield number "$i" "${_stat[$i]}"
-
-			_nextoutput
-			_graboutput
-			cat "$f"
-			_ungraboutput
-			output_fieldname="content"
-			#_addfield file_lines_array content "$outfile"
-			#_addfield file_lines_array error "$errfile"
-		else
-			_addfield boolean exists false
-		fi
-		subsection "$f" _emit
-	done
-}
-
-function getstdinfiles {
-	local i
-	while read i; do
-		getfiles "$i"
-	done
-}
-
-function getfilesfromcommand {
-	"$@" | getstdinfiles
-}
-
-
-function lsfiles {
-	somefiles=
-	restfiles=
-	for f; do
-		if [ "x$restfiles" = "x" ]; then
-			case "$f" in
-				--) restfiles=y ;;
-				-*) ;;
-				*)
-					somefiles=y
-					break
-					;;
-			esac
-		else
-			somefiles=y
-			break
-		fi
-	done
-	if [ "x$somefiles" != "x" ]; then
-		ls -la "$@"
-	fi
-}
-
-
-##################################################################################
-
-
-function _main {
-
-	_set_defaults
-	_parse_cmdline "$@"
-	_print_header
-	_check_for_ref
-	_check_for_new_version
-	_check_valid_output_format
-	_init_output_vars
-	_reset_vars
-
-	if [ "$ref" ]; then
-		echo "Reference: $ref"
-		if [ "$ticket_url" ]; then
-			echo "Ticket URL: $ticket_url"
-		fi
-		echo
-	fi
-	echo "Please wait while diagnostic information is gathered"
-	echo "into the $finaloutput file..."
-	echo
-	echo "If the display remains stuck for more than 5 minutes,"
-	echo "please press Control-C."
-	echo
-
-
-	_setup_fds
-	_output_preamble
-
-	shopt -s nullglob
-
-
-	##################################################################################
-
-
-	# Generic/system/distro/boot info
-	section fingerprint fingerprint
-	section args runcommand printeach "$@"
-	section date runcommand date
-	section hostname runcommand hostname
-	section hostname_fqdn runcommand hostname -f
-	section whoami runcommand whoami
-	section mdiag_upgrade getenvvars inhibit_new_version_check inhibit_version_update updated_from relaunched_from newversion user_elected_no_update update_not_possible user_elected_not_to_run_newversion download_url download_target
-	section environment getenvvars PATH LD_LIBRARY_PATH LD_PRELOAD PYTHONPATH PYTHONHOME
-	section distro getfiles /etc/*release /etc/*version
-	section uname runcommand uname -a
-	section glibc runcommand lsfiles /lib*/libc.so* /lib/*/libc.so*
-	section glibc2 runcommand eval "/lib*/libc.so* || /lib/*/libc.so*"
-	section ld.so.conf getfiles /etc/ld.so.conf /etc/ld.so.conf.d/*
-	section lsb runcommand lsb_release -a
-	section rc.local getfiles /etc/rc.local
-	section sysctl runcommand sysctl -a
-	section sysctl.conf getfiles /etc/sysctl.conf /etc/sysctl.d/*
-	section ulimit runcommand ulimit -a
-	section limits.conf getfiles /etc/security/limits.conf /etc/security/limits.d/*
-	section selinux runcommand sestatus
-	section uptime runcommand uptime
-	section boot runcommand who -b
-	section runlevel runcommand who -r
-	section clock_change runcommand who -t
-	section timezone_config getfiles /etc/timezone /etc/sysconfig/clock
-	section timedatectl runcommand timedatectl
-	section localtime runcommand lsfiles /etc/localtime
-	section localtime_matches runcommand find /usr/share/zoneinfo -type f -exec cmp -s \{\} /etc/localtime \; -print
-	section clocksource getfiles /sys/devices/system/clocksource/clocksource*/{current,available}_clocksource
-
-	section chkconfig_list runcommand chkconfig --list
-	section initctl_list runcommand initctl list
-
-	# Block device/filesystem info
-	section scsi getfiles /proc/scsi/scsi
-	section blockdev runcommand blockdev --report
-	section lsblk runcommand lsblk
-
-	section udev_disks
-		runcommands
-			awk '{ $0 = $4 } /^[sh]d[a-z]+$/' /proc/partitions | xargs -n1 --no-run-if-empty udevadm info --query all --name
-		endruncommands
-	endsection
-
-	section fstab getfiles /etc/fstab
-	section mount runcommand mount
-	section df-h runcommand df -h
-	section df-k runcommand df -k
-
-	section mdstat getfiles /proc/mdstat
-	section mdadm_detail_scan runcommand mdadm --detail --scan
-	section mdadm_detail
-		runcommands
-			sed -ne 's,^\(md[0-9]\+\) : .*$,/dev/\1,p' < /proc/mdstat | xargs -n1 --no-run-if-empty mdstat --detail
-		endruncommands
-	endsection
-
-	section dmsetup runcommand dmsetup ls
-	section device_mapper runcommand lsfiles -R /dev/mapper /dev/dm-*
-
-	section lvm subsection pvs runcommand pvs -v
-	section lvm subsection vgs runcommand vgs -v
-	section lvm subsection lvs runcommand lvs -v
-	section lvm subsection pvdisplay runcommand pvdisplay -m
-	section lvm subsection vgdisplay runcommand vgdisplay -v
-	section lvm subsection lvdisplay runcommand lvdisplay -am
-
-	section nr_requests getfilesfromcommand find /sys -name nr_requests
-	section read_ahead_kb getfilesfromcommand find /sys -name read_ahead_kb
-	section scheduler getfilesfromcommand find /sys -name scheduler
-	section rotational getfilesfromcommand find /sys -name rotational
-
-	# Network info
-	section ifconfig runcommand ifconfig -a
-	section route runcommand route -n
-	section iptables runcommand iptables -L -v -n
-	section iptables_nat runcommand iptables -t nat -L -v -n
-	section ip_link runcommand ip link
-	section ip_addr runcommand ip addr
-	section ip_route runcommand ip route
-	section ip_rule runcommand ip rule
-	section ip_neigh runcommand ip neigh
-	section hosts getfiles /etc/hosts
-	section host.conf getfiles /etc/host.conf
-	section resolv getfiles /etc/resolv.conf
-	section nsswitch getfiles /etc/nsswitch.conf
-	section networks getfiles /etc/networks
-	section rpcinfo runcommand rpcinfo -p
-	section netstat runcommand netstat -anpoe
-
-	# Network time info
-	section ntp getfiles /etc/ntp.conf
-	section ntp subsection chkconfig runcommand chkconfig --list ntpd
-	section ntp subsection status runcommand ntpstat
-	section ntp subsection peers runcommand ntpq -p
-	section ntp subsection peers_n runcommand ntpq -pn
-	section chronyc subsection tracking runcommand chronyc tracking
-	section chronyc subsection sources runcommand chronyc sources
-	section chronyc subsection sourcestats runcommand chronyc sourcestats
-
-	# Hardware info
-	section dmesg runcommand dmesg
-	section lspci runcommand lspci -vvv
-	section dmidecode runcommand dmidecode --type memory
-	section sensors runcommand sensors
-	section mcelog getfiles /var/log/mcelog
-
-	# Numa settings
-	section numactl subsection command runcommand which numactl
-	section numactl subsection hardware runcommand numactl --hardware
-	section numactl subsection show runcommand numactl --show
-
-	# Process/kernel info
-	section procinfo getfiles /proc/mounts /proc/self/mountinfo /proc/cpuinfo /proc/meminfo /proc/zoneinfo /proc/swaps /proc/modules /proc/vmstat /proc/loadavg /proc/uptime /proc/cgroups /proc/partitions
-	section transparent_hugepage getfilesfromcommand find /sys/kernel/mm/{redhat_,}transparent_hugepage -type f
-	section ps runcommand ps -eLFww
-
-	# Dynamic/monitoring info
-	section top
-	runcommands
-	COLUMNS=512 top -b -d 1 -n 30 -c | sed -e 's/ *$//g'
-	endruncommands
-	endsection
-	section top_threads
-	runcommands
-	COLUMNS=512 top -b -d 1 -n 30 -c -H | sed -e 's/ *$//g'
-	endruncommands
-	endsection
-	section iostat runcommand iostat -xtm 1 120
-
-	# Mongo process info
-	mongo_pids="`pgrep mongo`"
-	section mongo_summary runcommand ps -Fww -p $mongo_pids
-	for pid in $mongo_pids; do
-		section proc/$pid
-			runcommand lsfiles /proc/$pid/cmdline
-			subsection cmdline runcommand printeach0file /proc/$pid/cmdline
-			printeach0file /proc/$pid/cmdline | awk '$0 == "-f" || $0 == "--config" { getline; print; }' | getstdinfiles
-			getfiles /proc/$pid/limits /proc/$pid/mounts /proc/$pid/mountinfo /proc/$pid/smaps /proc/$pid/numa_maps
-			subsection /proc/$pid/fd runcommand lsfiles /proc/$pid/fd
-			subsection /proc/$pid/fdinfo runcommand lsfiles /proc/$pid/fdinfo
-			getfiles /proc/$pid/cgroup
-		endsection
-	done
-	section global_mongodb_conf getfiles /etc/mongodb.conf /etc/mongod.conf
-	section global_mms_conf getfiles /etc/mongodb-mms/*
-
-	# Hardware info with a risk of hanging
-	section smartctl
-		runcommands
-			smartctl --scan | sed -e "s/#.*$//" | while read i; do smartctl --all $i; done
-		endruncommands
-	endsection
-	section scsidevices getfiles /sys/bus/scsi/devices/*/model
-
-
-	##################################################################################
-
-
-	_teardown_fds
-	_output_postamble
-	_finish
-
-	cat <<EOF
-
-==============================================================
-MongoDB diagnostic information has been recorded in the file:
-
-    $finaloutput
-
-Please upload that file to the ticket${ticket_url:+ at:
-    $ticket_url}
-==============================================================
-
-EOF
-
-}
 
 if [ "${__MDIAG_UNIT_TEST:-unset}" = "unset" ]; then
 	_main "$@"
