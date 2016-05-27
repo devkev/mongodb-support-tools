@@ -56,16 +56,21 @@ if test "$_os" != "GNU/Linux"; then
 	exit 1
 fi
 
+
+###############################################################
+# Internal internal functions (not used by the actual tests)
+###############################################################
+
 _lf="$(echo -ne '\r')"
 
-function showversion {
+function _showversion {
 	echo "mdiag.sh: MongoDB System Diagnostic Information Gathering Tool"
 	echo "version $version, copyright (c) 2014-2016, MongoDB, Inc."
 }
 
-function showhelp {
+function _showhelp {
 	echo ""
-	showversion
+	_showversion
 	echo ""
 	echo "Usage:"
 	echo "    sudo bash mdiag.sh [options] [reference]"
@@ -81,7 +86,7 @@ function showhelp {
 	echo ""
 }
 
-function user_error_fatal {
+function _user_error_fatal {
 	echo ""
 	echo "mdiag.sh: ERROR: $*"
 	echo "Run \"bash mdiag.sh --help\" for help."
@@ -123,7 +128,7 @@ function _parse_cmdline {
 						auto_answer=""  # simulates pressing Enter
 						;;
 					*)
-						user_error_fatal "unknown value for --answer: \"$1\""
+						_user_error_fatal "unknown value for --answer: \"$1\""
 						;;
 				esac
 				;;
@@ -142,15 +147,15 @@ function _parse_cmdline {
 				relaunched_from="$1"
 				;;
 			--help|-h)
-				showhelp
+				_showhelp
 				exit 0
 				;;
 			--version|-v)
-				showversion
+				_showversion
 				exit 0
 				;;
 			*)
-				user_error_fatal "unknown parameter \"$1\""
+				_user_error_fatal "unknown parameter \"$1\""
 				;;
 		esac
 		shift
@@ -183,7 +188,7 @@ function _check_for_ref {
 	fi
 }
 
-function read_ynq {
+function _read_ynq {
 	local msg="$1"
 	local default="${2:-y}"
 	local choices="("
@@ -221,30 +226,30 @@ function read_ynq {
 	esac
 }
 
-function clean_download_target {
+function _clean_download_target {
 	rm -f "$download_target"
 }
 
-function get_with {
+function _get_with {
 	if ! type -p "$1" > /dev/null; then
 		return 1
 	fi
 
-	clean_download_target   # remove any old version
+	_clean_download_target   # remove any old version
 	"$@"
 	local _rc=$?
 	if [ $_rc -ne 0 ]; then
-		clean_download_target   # get rid of any partial download
+		_clean_download_target   # get rid of any partial download
 	fi
 	return $_rc
 }
 
-function get_with_wget {
-	get_with wget --quiet --tries 1 --timeout 10 --output-document "$download_target" "$download_url"
+function _get_with_wget {
+	_get_with wget --quiet --tries 1 --timeout 10 --output-document "$download_target" "$download_url"
 }
 
-function get_with_curl {
-	get_with curl --silent --retry 0 --connect-timeout 10 --max-time 120 --output "$download_target" "$download_url"
+function _get_with_curl {
+	_get_with curl --silent --retry 0 --connect-timeout 10 --max-time 120 --output "$download_target" "$download_url"
 }
 
 function _check_for_new_version {
@@ -252,11 +257,11 @@ function _check_for_new_version {
 		download_url='https://raw.githubusercontent.com/mongodb/support-tools/master/mdiag/mdiag.sh'
 		# FIXME: put this (and everything) into an $outputbase-based subdir
 		download_target="$outputbase-$$-mdiag.sh"
-		trap clean_download_target EXIT   # don't leak downloaded script on shell exit
+		trap _clean_download_target EXIT   # don't leak downloaded script on shell exit
 		echo "Checking for a newer version of mdiag.sh..."
 		# first try wget, then try curl, then give up
-		if ! get_with_wget; then
-			if ! get_with_curl; then
+		if ! _get_with_wget; then
+			if ! _get_with_curl; then
 				echo "Warning: Unable to check for a newer version."
 			fi
 		fi
@@ -277,7 +282,7 @@ function _check_for_new_version {
 					echo "Warning: Auto version update $0 not possible (no write permission)"
 					update_not_possible=y
 				else
-					read_ynq "Update $0 to this version"
+					_read_ynq "Update $0 to this version"
 					case "$REPLY" in
 						[Yy]|"")
 							echo "Updating $0 to version $newversion..."
@@ -286,7 +291,7 @@ function _check_for_new_version {
 							if cat "$download_target" > "$0"; then
 								echo "Launching updated version of $0..."
 								echo
-								clean_download_target   # trap EXIT doesn't fire on exec
+								_clean_download_target   # trap EXIT doesn't fire on exec
 								exec bash "$0" --internal-updated-from "$version" "$@"
 							else
 								echo "mdiag.sh: ERROR: failed to update $0 to new version..."
@@ -301,14 +306,14 @@ function _check_for_new_version {
 				fi
 				# If we get here, either user said not to replace $0, or no write permission.
 				# Offer to run the new version anyway.
-				read_ynq "Use new version of mdiag.sh without updating"
+				_read_ynq "Use new version of mdiag.sh without updating"
 				case "$REPLY" in
 					[Yy]|"")
 						echo "Running new version without updating $0..."
 						echo
 						bash "$download_target" --internal-relaunched-from "$version" "$@"
 						local _rc=$?
-						clean_download_target
+						_clean_download_target
 						exit $_rc
 						;;
 					[Nn])
@@ -333,7 +338,7 @@ function _check_valid_output_format {
 			;;
 		*)
 			# invalid
-			user_error_fatal "unsupported output format \"$outputformat\""
+			_user_error_fatal "unsupported output format \"$outputformat\""
 			;;
 	esac
 }
@@ -345,11 +350,6 @@ function _init_output_vars {
 	mainoutput="$outputbase-$$.$outputformat"
 	finaloutput="$outputbase.$outputformat"
 }
-
-
-###############################################################
-# Internal internal functions (not used by the actual tests)
-###############################################################
 
 function _nextoutput {
 	numoutputs=$(($numoutputs + 1))
