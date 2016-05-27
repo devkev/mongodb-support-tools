@@ -90,17 +90,17 @@ function user_error_fatal {
 }
 
 function _set_defaults {
-	declare -g outputformat=json
-	declare -g inhibit_new_version_check=n
-	declare -g inhibit_version_update=n
-	declare -g ref
-	declare -g ticket_url
+	outputformat=json
+	inhibit_new_version_check=n
+	inhibit_version_update=n
+	ref=""
+	ticket_url=""
 
-	declare -g host="$(hostname)"
-	declare -g tag="$(_now)"
+	host="$(hostname)"
+	tag="$(_now)"
 
 	# FIXME: put everything into a subdir (using mktemp)
-	declare -g outputbase="${TMPDIR:-/tmp}/mdiag-$host"
+	outputbase="${TMPDIR:-/tmp}/mdiag-$host"
 }
 
 function _parse_cmdline {
@@ -117,10 +117,10 @@ function _parse_cmdline {
 				shift
 				case "$1" in
 					[yYnNqQ])
-						declare -g auto_answer="$1"
+						auto_answer="$1"
 						;;
 					[dD])
-						declare -g auto_answer=""  # simulates pressing Enter
+						auto_answer=""  # simulates pressing Enter
 						;;
 					*)
 						user_error_fatal "unknown value for --answer: \"$1\""
@@ -135,11 +135,11 @@ function _parse_cmdline {
 				;;
 			--internal-updated-from)
 				shift
-				declare -g updated_from="$1"
+				updated_from="$1"
 				;;
 			--internal-relaunched-from)
 				shift
-				declare -g relaunched_from="$1"
+				relaunched_from="$1"
 				;;
 			--help|-h)
 				showhelp
@@ -249,9 +249,9 @@ function get_with_curl {
 
 function _check_for_new_version {
 	if [ "$inhibit_new_version_check" != y -a "$updated_from" = "" -a "$relaunched_from" = "" ]; then
-		declare -g download_url='https://raw.githubusercontent.com/mongodb/support-tools/master/mdiag/mdiag.sh'
+		download_url='https://raw.githubusercontent.com/mongodb/support-tools/master/mdiag/mdiag.sh'
 		# FIXME: put this (and everything) into an $outputbase-based subdir
-		declare -g download_target="$outputbase-$$-mdiag.sh"
+		download_target="$outputbase-$$-mdiag.sh"
 		trap clean_download_target EXIT   # don't leak downloaded script on shell exit
 		echo "Checking for a newer version of mdiag.sh..."
 		# first try wget, then try curl, then give up
@@ -264,7 +264,7 @@ function _check_for_new_version {
 			if cmp -s "$0" "$download_target"; then
 				echo "No new version available."
 			else
-				declare -g newversion="$(sed -e '/^version="/{s/"$//;s/^.*"//;q}' -e 'd' "$download_target")"
+				newversion="$(sed -e '/^version="/{s/"$//;s/^.*"//;q}' -e 'd' "$download_target")"
 				if [ "$newversion" = "" ]; then
 					newversion="(unknown)"
 				fi
@@ -272,10 +272,10 @@ function _check_for_new_version {
 				echo
 				if [ "$inhibit_version_update" = y ]; then
 					echo "Warning: Auto version update $0 not possible (user-inhibited)"
-					declare -g update_not_possible=y
+					update_not_possible=y
 				elif [ ! -w "$0" ]; then
 					echo "Warning: Auto version update $0 not possible (no write permission)"
-					declare -g update_not_possible=y
+					update_not_possible=y
 				else
 					read_ynq "Update $0 to this version"
 					case "$REPLY" in
@@ -295,7 +295,7 @@ function _check_for_new_version {
 							;;
 						[Nn])
 							echo "Not updating to $0"
-							declare -g user_elected_no_update=y
+							user_elected_no_update=y
 							;;
 					esac
 				fi
@@ -313,7 +313,7 @@ function _check_for_new_version {
 						;;
 					[Nn])
 						echo "Not using new version $newversion, continuing with existing version $version..."
-						declare -g user_elected_not_to_run_newversion=y
+						user_elected_not_to_run_newversion=y
 						;;
 				esac
 			fi
@@ -339,11 +339,11 @@ function _check_valid_output_format {
 }
 
 function _init_output_vars {
-	declare -g numoutputs=0
+	numoutputs=0
 
 	# FIXME: use mktemp if possible
-	declare -g mainoutput="$outputbase-$$.$outputformat"
-	declare -g finaloutput="$outputbase.$outputformat"
+	mainoutput="$outputbase-$$.$outputformat"
+	finaloutput="$outputbase.$outputformat"
 }
 
 
@@ -458,7 +458,9 @@ function _jsonify {
 
 function _reset_vars {
 	unset ts_started ts_ended ts command rc types fields values outputnum output_fieldname
-	declare -a types fields values
+	types=()
+	fields=()
+	values=()
 }
 
 function _emit_txt {
@@ -590,7 +592,7 @@ function _setup_fds {
 
 	# Grab any stray stderr
 	_nextoutput
-	declare -g stray_stderr_outfile="$errfile"
+	stray_stderr_outfile="$errfile"
 	exec 4>> "$stray_stderr_outfile"
 	exec 2>&4
 }
@@ -1029,7 +1031,7 @@ function _main {
 	section iostat runcommand iostat -xtm 1 120
 
 	# Mongo process info
-	declare -g mongo_pids="`pgrep mongo`"
+	mongo_pids="`pgrep mongo`"
 	section mongo_summary runcommand ps -Fww -p $mongo_pids
 	for pid in $mongo_pids; do
 		section proc/$pid
