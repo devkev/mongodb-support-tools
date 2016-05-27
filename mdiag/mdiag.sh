@@ -1079,6 +1079,6 @@ EOF
 }
 
 if [ "${__MDIAG_UNIT_TEST:-unset}" = "unset" ]; then
-	_main
+	_main "$@"
 fi
 
