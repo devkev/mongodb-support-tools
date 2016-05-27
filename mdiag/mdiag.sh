@@ -753,6 +753,7 @@ function getfiles {
 			_addfield boolean exists true
 			_addfield string ls "$(ls -l "$f" 2>&1)"
 
+			# FIXME: this doesn't need an associative array; remove it
 			declare -lA _stat
 			local format
 			format+="_stat[mode_oct]='%a' "
