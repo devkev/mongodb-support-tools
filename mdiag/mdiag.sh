@@ -849,11 +849,11 @@ function _json_stringify {
 	s="${s//\"/\\\"}"
 	s="${s//	/\\t}"
 	s="${s//$_lf/\\r}"
-	echo "\"$s\""
+	echo -n "\"$s\""
 }
 
 function _json_dateify {
-	echo "{ \"\$date\" : $(_json_stringify "$1") }"
+	echo -n "{ \"\$date\" : $(_json_stringify "$1") }"
 }
 
 function _json_lines_arrayify {
@@ -910,7 +910,7 @@ function _jsonify {
 			val="$*"
 			;;
 	esac
-	echo "$val"
+	echo -n "$val"
 }
 
 function _reset_vars {
