@@ -857,9 +857,14 @@ function _json_dateify {
 }
 
 function _json_lines_arrayify {
-	# Outputs an unbalanced closing square bracket - make sure there has been an opening square bracket.
-	# On empty input, outputs nothing at all (including no closing square bracket).
-	sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/\t/\\t/g' -e 's/\r/\\r/g' -e 's/^/    "/' -e 's/$/"/' -e '$s/$/ ]/'
+	if [ -s "$1" ]; then
+		echo "["
+		sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/\t/\\t/g' -e 's/\r/\\r/g' -e 's/^/    "/' -e 's/$/"/' -e '$s/$/ ]/' < "$1"
+	else
+		echo -n "null"
+	fi
+	# feels risky to have this here...
+	rm -f "$1"
 }
 
 function _jsonify {
@@ -898,13 +903,7 @@ function _jsonify {
 			val="$(_json_strings_arrayify "$@")"
 			;;
 		file_lines_array)
-			if [ -s "$1" ]; then
-				val="$(echo "[" ; _json_lines_arrayify < "$1")"
-			else
-				val="null"
-			fi
-			# feels risky to have this here...
-			rm -f "$1"
+			val="$(_json_lines_arrayify "$1")"
 			;;
 		*)
 			val="$*"
