@@ -856,15 +856,34 @@ function _json_dateify {
 	echo -n "{ \"\$date\" : $(_json_stringify "$1") }"
 }
 
+function _do_json_lines_arrayify {
+	echo "["
+	sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/\t/\\t/g' -e 's/\r/\\r/g' -e 's/^/    "/' -e 's/$/"/' -e '$s/$/ ]/'
+}
+
 function _json_lines_arrayify {
-	if [ -s "$1" ]; then
-		echo "["
-		sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/\t/\\t/g' -e 's/\r/\\r/g' -e 's/^/    "/' -e 's/$/"/' -e '$s/$/ ]/' < "$1"
+	if [ $# -eq 0 ]; then
+		# Can't use `local input="$(cat)"` because that strips trailing newline.
+		local input
+		IFS= read -rd '' input
+		if [ "$input" ]; then
+			# Can't use `_do_json_lines_arrayify <<<"$input"` because that adds a trailing newline
+			# (since it's modelled on `<<EOF`, which by design always has a trailing newline).
+			echo -n "$input" | _do_json_lines_arrayify
+		else
+			echo -n "null"
+		fi
 	else
-		echo -n "null"
+		if [ -s "$1" ]; then
+			_do_json_lines_arrayify < "$1"
+		else
+			echo -n "null"
+		fi
+		if [ -f "$1" ]; then
+			# feels risky to have this here...
+			rm -f "$1"
+		fi
 	fi
-	# feels risky to have this here...
-	rm -f "$1"
 }
 
 function _jsonify {
